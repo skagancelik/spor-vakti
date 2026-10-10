@@ -17,7 +17,7 @@ Sana ne yapacağını söylemez. Ama sana sorar: **gerçekten yapıyor musun, yo
 | | |
 |---|---|
 | ![Soru](docs/1-spor-vakti.png) | **Saat başı (07:00–23:00):** Tam ekran "Spor vakti." Bugünkü durumun altta: seans, dakika, pas. |
-| ![Emin misin](docs/2-emin-misin.png) | **Pas geçmek istersen:** "Bugün 2. pas olacak. Bugün toplam 20 dakika spordan mahrum kalacaksın." Pas geçmek için **evet** yazman gerekir. |
+| ![Emin misin](docs/2-emin-misin.png) | **Pas geçmek istersen:** "Bugün 2. pas olacak. Bugün toplam 20 dakika spordan mahrum kalacaksın." Kutuya **evet** yazınca **Pas geç** düğmesi açılır. **Spora başla** her zaman orada. |
 | ![Seans](docs/3-seans.png) | **Başlıyorum dersen:** 10 dakikalık geri sayım. Erken bitirirsen eksik kalan dakikalar da sayılır. |
 | ![Tamamlandı](docs/4-tamamlandi.png) | **Bitince:** Bugün kaçıncı seans olduğu ve toplam spor süresi. |
 | ![Uyku hazırlığı](docs/5-uyku-hazirlik.png) | **23:30:** "Uyumak için hazırlıklarını yap." |
@@ -76,7 +76,7 @@ It doesn't tell you what to do. It asks: **are you actually doing it, or skippin
 ### How it works
 
 - **Every hour (07:00–23:00):** a full-screen "Spor vakti." prompt with today's tally (sessions, minutes, skips).
-- **Skip?** A confirmation screen shows the cost ("This will be skip #2 today, 20 minutes missed"). You have to type **evet** ("yes") to skip.
+- **Skip?** A confirmation screen shows the cost ("This will be skip #2 today, 20 minutes missed"). Typing **evet** ("yes") unlocks the **Pas geç** (Skip) button; **Spora başla** (Start) is always there. Your choice is recorded explicitly.
 - **Start?** A 10-minute countdown. Ending early still counts the missing minutes.
 - **Done:** today's session count and total exercise time.
 - **23:30:** "Get ready for bed." **23:59:** "Bedtime." Night notices close only with **Tamam** (OK).

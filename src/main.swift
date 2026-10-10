@@ -217,6 +217,15 @@ final class ActionButton: NSButton {
     }
     required init?(coder: NSCoder) { fatalError() }
     @objc func fire() { handler?() }
+
+    func setActive(_ on: Bool) {
+        isEnabled = on
+        alphaValue = on ? 1 : 0.3
+    }
+}
+
+func isYes(_ text: String) -> Bool {
+    text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(with: Locale(identifier: "tr_TR")) == "evet"
 }
 
 /// Enter'a basılınca handler'ı çağıran yazı kutusu
@@ -240,7 +249,12 @@ final class EntryField: NSTextField {
         action = #selector(fire)
     }
     required init?(coder: NSCoder) { fatalError() }
+    var onChange: ((String) -> Void)?
     @objc func fire() { handler?(stringValue) }
+    override func textDidChange(_ notification: Notification) {
+        super.textDidChange(notification)
+        onChange?(stringValue)
+    }
 }
 
 func label(_ text: String, _ size: CGFloat, _ weight: NSFont.Weight, _ color: NSColor,
@@ -282,6 +296,7 @@ final class Controller {
     var fills: [NSView] = []
     var barW: [CGFloat] = []
     var confirmHints: [NSTextField] = []
+    var passButtons: [ActionButton] = []
     var timer: Timer?
     var deadline: Timer?
     var start = Date()
@@ -332,7 +347,7 @@ final class Controller {
     /// Her ekranın içeriğini yeniden kurar
     func render(_ build: (Canvas, Int) -> Void) {
         contents.forEach { $0.removeFromSuperview() }
-        contents = []; clocks = []; fills = []; barW = []; confirmHints = []
+        contents = []; clocks = []; fills = []; barW = []; confirmHints = []; passButtons = []
         for (i, root) in roots.enumerated() {
             let c = NSView(frame: root.bounds)
             c.alphaValue = 0
@@ -446,7 +461,7 @@ final class Controller {
             cv.view.addSubview(label("Bugün \(n). pas olacak.", 84 * s, .bold, C_WHITE, cv.row(cy + 104 * s, 110 * s)))
             cv.view.addSubview(label("Bugün toplam \(missed) dakika spordan mahrum kalacaksın.", 28 * s, .medium, C_WARN,
                                      cv.row(cy + 50 * s, 42 * s)))
-            let hint = label("Pas geçmek için  evet  yaz ve Enter'a bas.", 19 * s, .regular, C_MUTED,
+            let hint = label("Pas geçmek için  evet  yaz, sonra  Pas geç  düğmesine bas.", 19 * s, .regular, C_MUTED,
                              cv.row(cy - 2 * s, 30 * s))
             cv.view.addSubview(hint)
             self.confirmHints.append(hint)
@@ -462,38 +477,56 @@ final class Controller {
             if i == 0 {
                 let fs = 26 * s
                 let f = EntryField(frame: NSRect(x: 20, y: (fh - fs * 1.3) / 2, width: fw - 40, height: fs * 1.3), fontSize: fs)
-                f.handler = { [weak self] text in self?.confirmSkip(text) }
+                f.handler = { [weak self] text in self?.typedEnter(text) }
+                f.onChange = { [weak self] text in
+                    self?.passButtons.forEach { $0.setActive(isYes(text)) }
+                }
                 box.addSubview(f)
                 field = f
             }
 
-            let bw = 300 * s, bh = 58 * s
-            let back = ActionButton("Vazgeç, başlıyorum", primary: true,
-                                    frame: NSRect(x: (cv.w - bw) / 2, y: cy - 190 * s, width: bw, height: bh),
-                                    fontSize: 20 * s)
-            back.handler = { [weak self] in self?.startWorkout() }
-            cv.view.addSubview(back)
+            // İki net seçenek: hangisine basıldıysa o kaydedilir
+            let bw = 260 * s, bh = 60 * s, gap = 22 * s
+            let x0 = (cv.w - (bw * 2 + gap)) / 2, by = cy - 190 * s
+            let pass = ActionButton("Pas geç", primary: true,
+                                    frame: NSRect(x: x0, y: by, width: bw, height: bh),
+                                    fontSize: 21 * s, color: C_WARN)
+            pass.handler = { [weak self] in self?.confirmSkip() }
+            pass.setActive(false)
+            self.passButtons.append(pass)
+            let go = ActionButton("Spora başla", primary: true,
+                                  frame: NSRect(x: x0 + bw + gap, y: by, width: bw, height: bh), fontSize: 21 * s)
+            go.handler = { [weak self] in self?.startWorkout() }
+            cv.view.addSubview(pass); cv.view.addSubview(go)
 
             cv.view.addSubview(label("Esc  geri dön", 13 * s, .regular, C_FAINT, cv.row(58, 22), tracking: 1.2))
         }
         if let f = field { windows.first?.makeFirstResponder(f) }
     }
 
-    func confirmSkip(_ text: String) {
+    /// "Pas geç" yalnızca kutuya "evet" yazıldıktan sonra etkinleşir.
+    func confirmSkip() {
+        guard phase == .confirm, passButtons.first?.isEnabled == true else { return }
+        deadline?.invalidate()
+        journal.append(.skipped, planned: SESSION_MIN, done: 0, at: triggeredAt)
+        quit()
+    }
+
+    /// Kutuda Enter: karar düğmelerle verilir, burada yalnızca yol gösterilir.
+    func typedEnter(_ text: String) {
         guard phase == .confirm else { return }
-        let answer = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased(with: Locale(identifier: "tr_TR"))
-        if answer == "evet" {
-            deadline?.invalidate()
-            journal.append(.skipped, planned: SESSION_MIN, done: 0, at: triggeredAt)
-            quit()
+        let message: String
+        if isYes(text) {
+            message = "Şimdi seç:  Pas geç  ya da  Spora başla."
         } else {
             NSSound(named: "Funk")?.play()
-            for h in confirmHints {
-                let attrs = h.attributedStringValue.attributes(at: 0, effectiveRange: nil)
-                h.attributedStringValue = NSAttributedString(string: "Sadece  evet  yazarsan pas geçilir.", attributes: attrs)
-            }
+            message = "Sadece  evet  yazarsan pas geçebilirsin."
             (windows.first?.firstResponder as? NSTextView)?.string = ""
+            passButtons.forEach { $0.setActive(false) }
+        }
+        for h in confirmHints {
+            let attrs = h.attributedStringValue.attributes(at: 0, effectiveRange: nil)
+            h.attributedStringValue = NSAttributedString(string: message, attributes: attrs)
         }
     }
 
