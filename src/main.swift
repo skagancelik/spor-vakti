@@ -299,6 +299,9 @@ final class Controller {
     var passButtons: [ActionButton] = []
     var timer: Timer?
     var deadline: Timer?
+    /// Küçültülmüş seansta köşede duran küçük sayaç (müzik açmak vb. için bilgisayar kullanılabilir)
+    var mini: NSPanel?
+    var miniClock: NSTextField?
     var start = Date()
     let triggeredAt = Date()
 
@@ -367,7 +370,7 @@ final class Controller {
         switch phase {
         case .prompt:  if enter { startWorkout() } else if esc { askToSkip() }
         case .confirm: if esc { showPrompt(first: false) }
-        case .workout: if esc { finishWorkout(early: true) }
+        case .workout: if esc { finishWorkout(early: true) } else if code == 46 { minimize() }  // M
         case .summary: quit()
         case .notice:  if enter { quit() }
         }
@@ -558,14 +561,20 @@ final class Controller {
             cv.view.addSubview(label("Bilgisayar seni bekler.", 22 * s, .regular, C_MUTED,
                                      cv.row(cy - 100 * s, 34 * s)))
 
-            let ew = 220 * s, eh = 52 * s
+            let ew = 240 * s, eh = 52 * s, gap = 18 * s
+            let x0 = (cv.w - (ew * 2 + gap)) / 2
+            let shrink = ActionButton("Küçült · müzik aç", primary: false,
+                                      frame: NSRect(x: x0, y: cy - 190 * s, width: ew, height: eh),
+                                      fontSize: 17 * s)
+            shrink.handler = { [weak self] in self?.minimize() }
             let early = ActionButton("Erken bitir", primary: false,
-                                     frame: NSRect(x: (cv.w - ew) / 2, y: cy - 190 * s, width: ew, height: eh),
+                                     frame: NSRect(x: x0 + ew + gap, y: cy - 190 * s, width: ew, height: eh),
                                      fontSize: 17 * s)
             early.handler = { [weak self] in self?.finishWorkout(early: true) }
-            cv.view.addSubview(early)
+            cv.view.addSubview(shrink); cv.view.addSubview(early)
 
-            cv.view.addSubview(label("Esc  erken bitir", 13 * s, .regular, C_FAINT, cv.row(58, 22), tracking: 1.2))
+            cv.view.addSubview(label("M  küçült        Esc  erken bitir", 13 * s, .regular, C_FAINT,
+                                     cv.row(58, 22), tracking: 1.2))
             self.clocks.append(clock); self.fills.append(fill); self.barW.append(bw)
         }
 
@@ -589,11 +598,73 @@ final class Controller {
         }
         let ratio = CGFloat(min(1, elapsed / SESSION_SEC))
         for (i, f) in fills.enumerated() { f.frame.size.width = barW[i] * ratio }
+        if let c = miniClock, c.stringValue != text {
+            let attrs = c.attributedStringValue.attributes(at: 0, effectiveRange: nil)
+            c.attributedStringValue = NSAttributedString(string: text, attributes: attrs)
+        }
+    }
+
+    // MARK: 2b) Küçültülmüş seans — sayaç sürer, bilgisayar kullanılabilir
+
+    func minimize() {
+        guard phase == .workout, mini == nil else { return }
+        let w: CGFloat = 250, h: CGFloat = 112, m: CGFloat = 20
+        let vf = (NSScreen.main ?? NSScreen.screens[0]).visibleFrame
+        let panel = NSPanel(contentRect: NSRect(x: vf.maxX - w - m, y: vf.maxY - h - m, width: w, height: h),
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.level = .floating
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.isFloatingPanel = true
+        panel.hidesOnDeactivate = false
+        panel.isMovableByWindowBackground = true
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.isReleasedWhenClosed = false
+        panel.sharingType = .none
+
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: w, height: h))
+        root.wantsLayer = true
+        root.layer?.cornerRadius = 18
+        root.layer?.backgroundColor = C_BG2.withAlphaComponent(0.94).cgColor
+        root.layer?.borderWidth = 1
+        root.layer?.borderColor = NSColor(white: 1, alpha: 0.12).cgColor
+        panel.contentView = root
+
+        root.addSubview(label("SPOR", 10, .semibold, C_FAINT, NSRect(x: 0, y: h - 26, width: w, height: 16), tracking: 2.5))
+        let clock = label("00:00", 34, .medium, C_ACCENT, NSRect(x: 0, y: 44, width: w, height: 42), mono: true)
+        root.addSubview(clock)
+        let bw: CGFloat = 105, bh: CGFloat = 28, gap: CGFloat = 10
+        let x0 = (w - (bw * 2 + gap)) / 2
+        let big = ActionButton("Büyüt", primary: false, frame: NSRect(x: x0, y: 12, width: bw, height: bh), fontSize: 13)
+        big.handler = { [weak self] in self?.expand() }
+        let end = ActionButton("Erken bitir", primary: false,
+                               frame: NSRect(x: x0 + bw + gap, y: 12, width: bw, height: bh), fontSize: 13)
+        end.handler = { [weak self] in self?.finishWorkout(early: true) }
+        root.addSubview(big); root.addSubview(end)
+
+        mini = panel; miniClock = clock
+        tick()
+        windows.forEach { $0.orderOut(nil) }
+        panel.orderFrontRegardless()
+        NSApp.deactivate()
+    }
+
+    /// Tam ekrana geri döner (Büyüt, ya da seans bitince özet için)
+    func expand() {
+        guard let panel = mini else { return }
+        panel.orderOut(nil)
+        mini = nil; miniClock = nil
+        for (i, win) in windows.enumerated() {
+            if i == 0 { win.makeKeyAndOrderFront(nil) } else { win.orderFrontRegardless() }
+        }
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func finishWorkout(early: Bool) {
         guard phase == .workout else { return }
         timer?.invalidate()
+        expand()
         let elapsed = Date().timeIntervalSince(start)
         let doneMin = early ? min(SESSION_MIN, Int(elapsed / 60)) : SESSION_MIN
 
