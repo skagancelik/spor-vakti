@@ -1,5 +1,5 @@
 #!/bin/bash
-# launchd tarafından saat başı ve 23:30 / 23:59'da çağrılır.
+# launchd tarafından 5 dakikada bir ve 23:59'da çağrılır.
 # Koşulları kontrol eder, uygunsa ilgili ekranı açar.
 # Kullanım: run.sh                         (otomatik, saate göre karar verir)
 #           run.sh --deneme                (koşulsuz, 20 sn'lik kayıtsız spor denemesi)
@@ -17,15 +17,27 @@ if [ "$1" != "--deneme" ]; then
   if [ -f "$DATA_DIR/DURAKLAT" ]; then log "atlandı: duraklatılmış"; exit 0; fi
 
   HOUR=$((10#$(date +%H))); MIN=$((10#$(date +%M)))
+
+  # Erteleme: her "5 dk ertele" o günün saat başı düzenini 5 dk kaydırır
+  # (14:00 → 14:05 ertelenirse sonraki 15:05'te gelir). Ertesi gün sıfırlanır.
+  SHIFT=0
+  if [ -f "$DATA_DIR/erteleme" ]; then
+    IFS=, read -r SDAY SMIN < "$DATA_DIR/erteleme"
+    if [ "$SDAY" = "$(date +%Y-%m-%d)" ] && [[ "$SMIN" =~ ^[0-9]+$ ]]; then SHIFT=$((SMIN % 60)); fi
+  fi
+  # launchd 5 dakikada bir çağırır; yalnızca o saatin spor dakikasındaysak devam et
+  DELTA=$(( (MIN - SHIFT + 60) % 60 ))
+
   if [ "$HOUR" -eq 23 ] && [ "$MIN" -ge 30 ] && [ "$MIN" -lt 35 ]; then
     ARGS=(uyku-hazirlik)
   elif [ "$HOUR" -eq 23 ] && [ "$MIN" -ge 59 ]; then
     ARGS=(uyku)
+  elif [ "$DELTA" -ge 5 ]; then
+    exit 0  # spor dakikası değil (sessizce çık, log şişmesin)
   elif [ "$HOUR" -lt 7 ]; then
     log "atlandı: gece (spor uyarısı 07:00'den önce gösterilmez)"; exit 0
-  elif [ "$MIN" -ge 10 ]; then
-    # Bilgisayar uykudan geç uyandıysa eski saatin uyarısını gösterme
-    log "atlandı: geç tetikleme (:$MIN)"; exit 0
+  elif [ "$HOUR" -eq 23 ] && [ "$MIN" -ge 30 ]; then
+    log "atlandı: gece uyarısı saati (:$MIN)"; exit 0
   fi
 
   # Zoom ekran paylaşırken CptHost süreci çalışır — karşı taraf uyarıyı görmesin

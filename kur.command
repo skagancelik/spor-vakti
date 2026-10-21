@@ -1,5 +1,5 @@
 #!/bin/bash
-# Spor Vakti kurulumu: derler, ~/Applications/SporVakti altına kopyalar, saat başı LaunchAgent'ı yükler.
+# Spor Vakti kurulumu: derler, ~/Applications/SporVakti altına kopyalar, 5 dakikada bir çalışan LaunchAgent'ı yükler.
 set -e
 SRC="$(cd "$(dirname "$0")" && pwd)"
 APP_DIR="$HOME/Applications/SporVakti"
@@ -29,7 +29,17 @@ cat > "$PLIST" <<PL
   <key>StartCalendarInterval</key>
   <array>
     <dict><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>23</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Minute</key><integer>5</integer></dict>
+    <dict><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Minute</key><integer>15</integer></dict>
+    <dict><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Minute</key><integer>25</integer></dict>
+    <dict><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Minute</key><integer>35</integer></dict>
+    <dict><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Minute</key><integer>45</integer></dict>
+    <dict><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Minute</key><integer>55</integer></dict>
     <dict><key>Hour</key><integer>23</integer><key>Minute</key><integer>59</integer></dict>
   </array>
   <key>RunAtLoad</key><false/>
@@ -40,5 +50,5 @@ PL
 
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
-echo "✅ Kuruldu. Saat başı (07:00–23:00) spor, 23:30 ve 23:59'da uyku uyarısı gelecek."
+echo "✅ Kuruldu. Saat başı (07:00–23:00) spor (ertelersen o günkü düzen 5 dk kayar), 23:30 ve 23:59'da uyku uyarısı gelecek."
 echo "   Denemek için: deneme.command"

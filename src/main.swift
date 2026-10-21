@@ -21,6 +21,8 @@ let SESSION_MIN: Int = max(1, Int(env["SPOR_VAKTI_DK"] ?? "") ?? 10)
 let SESSION_SEC: Double = isTrial ? 20 : Double(SESSION_MIN * 60)
 /// Bu süre içinde cevap verilmezse seans "cevapsız" (pas) sayılır.
 let ANSWER_TIMEOUT: TimeInterval = isTrial ? 60 : 5 * 60
+/// "Ertele" bu kadar dakika kaydırır; sonraki saat başı uyarılar da aynı kadar kayar.
+let SNOOZE_MIN = 5
 /// Özet ekranı bu süre sonra kendiliğinden kapanır.
 let SUMMARY_SEC: TimeInterval = 10
 
@@ -49,6 +51,8 @@ struct DayStats {
 
 final class Journal {
     let url: URL
+    /// Bugünkü erteleme kayması: "yyyy-MM-dd,dakika" (run.sh okur)
+    let shiftURL: URL
     static let header = "tarih,saat,sonuc,plan_dk,yapilan_dk\n"
 
     init() {
@@ -57,6 +61,22 @@ final class Journal {
                 .appendingPathComponent("SporVakti")
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         url = base.appendingPathComponent("gecmis.csv")
+        shiftURL = base.appendingPathComponent("erteleme")
+    }
+
+    /// Bugünkü toplam kayma (dakika, 0–55). Başka güne aitse 0.
+    func todayShift() -> Int {
+        guard let text = try? String(contentsOf: shiftURL, encoding: .utf8) else { return 0 }
+        let c = text.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ",").map(String.init)
+        guard c.count == 2, c[0] == Journal.dayFmt.string(from: Date()), let m = Int(c[1]) else { return 0 }
+        return m % 60
+    }
+
+    /// Düzeni SNOOZE_MIN kaydırır: bu uyarı ve bugünkü sonrakiler o kadar geç gelir.
+    func snooze() {
+        if isTrial { return }
+        let m = (todayShift() + SNOOZE_MIN) % 60
+        try? "\(Journal.dayFmt.string(from: Date())),\(m)\n".write(to: shiftURL, atomically: true, encoding: .utf8)
     }
 
     static func fmt(_ pattern: String) -> DateFormatter {
@@ -368,7 +388,7 @@ final class Controller {
     func key(_ code: UInt16) {
         let enter = code == 36 || code == 76, esc = code == 53
         switch phase {
-        case .prompt:  if enter { startWorkout() } else if esc { askToSkip() }
+        case .prompt:  if enter { startWorkout() } else if esc { askToSkip() } else if code == 14 { snooze() }  // E
         case .confirm: if esc { showPrompt(first: false) }
         case .workout: if esc { finishWorkout(early: true) } else if code == 46 { minimize() }  // M
         case .summary: quit()
@@ -435,7 +455,14 @@ final class Controller {
             pass.handler = { [weak self] in self?.askToSkip() }
             cv.view.addSubview(go); cv.view.addSubview(pass)
 
-            cv.view.addSubview(label("Enter  başla        Esc  pas geç", 13 * s, .regular, C_FAINT,
+            let sw = 220 * s, sh = 50 * s
+            let later = ActionButton("\(SNOOZE_MIN) dk ertele", primary: false,
+                                     frame: NSRect(x: (cv.w - sw) / 2, y: by - sh - 24 * s, width: sw, height: sh),
+                                     fontSize: 17 * s)
+            later.handler = { [weak self] in self?.snooze() }
+            cv.view.addSubview(later)
+
+            cv.view.addSubview(label("Enter  başla        E  ertele        Esc  pas geç", 13 * s, .regular, C_FAINT,
                                      cv.row(58, 22), tracking: 1.2))
         }
         guard first else { return }
@@ -505,6 +532,15 @@ final class Controller {
             cv.view.addSubview(label("Esc  geri dön", 13 * s, .regular, C_FAINT, cv.row(58, 22), tracking: 1.2))
         }
         if let f = field { windows.first?.makeFirstResponder(f) }
+    }
+
+    /// Pas sayılmaz; bu uyarı ve bugünkü sonrakiler SNOOZE_MIN dakika kayar.
+    func snooze() {
+        guard phase == .prompt else { return }
+        deadline?.invalidate()
+        journal.snooze()
+        print("ertelendi: \(SNOOZE_MIN) dk (bugünkü kayma :\(String(format: "%02d", journal.todayShift())))")
+        quit()
     }
 
     /// "Pas geç" yalnızca kutuya "evet" yazıldıktan sonra etkinleşir.
