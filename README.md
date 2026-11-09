@@ -23,12 +23,12 @@ Sana ne yapacağını söylemez. Ama sana sorar: **gerçekten yapıyor musun, yo
 
 | | |
 |---|---|
-| ![Soru](docs/1-spor-vakti.png) | **Belirlediğin aralıkla (varsayılan saat başı, 07:00–23:00):** Tam ekran "Spor vakti." Bugünkü durumun altta: seans, dakika, pas. Sağ üstteki **Ayarlar** (ya da `A`) ile aralığı, süreyi ve müziği oradan değiştirebilirsin; yeni süre hemen geçerli olur. |
+| ![Soru](docs/1-spor-vakti.png) | **Belirlediğin saatlerde ve aralıkla (varsayılan 07:00–23:00, saat başı):** Tam ekran "Spor vakti." Bugünkü durumun altta: seans, dakika, pas. Sağ üstteki **Ayarlar** (ya da `A`) ile saatleri, aralığı, süreyi ve müziği oradan değiştirebilirsin; yeni süre hemen geçerli olur. |
 | | **Şimdi olmuyorsa:** **5 dk ertele** (ya da `E`). Pas sayılmaz; uyarı 5 dk sonra gelir ve o günün düzeni de 5 dk kayar (14:00 ertelendiyse 14:05, sonraki 15:05). Her erteleme 5 dk daha kaydırır; ertesi gün saat başına döner. |
 | ![Emin misin](docs/2-emin-misin.png) | **Pas geçmek istersen:** "Bugün 2. pas olacak. Bugün toplam 20 dakika spordan mahrum kalacaksın." Kutuya **evet** yazınca **Pas geç** düğmesi açılır. **Spora başla** her zaman orada. |
 | ![Seans](docs/3-seans.png) | **Başlıyorum dersen:** Geri sayım başlar (varsayılan 10 dk) ve **spor müziği çalmaya başlar**; süre bitince müzik de yavaşça susar. Erken bitirirsen eksik kalan dakikalar da sayılır. **Küçült · müzik aç** (ya da `M`) ile ekran köşede küçük bir sayaca dönüşür: müzik açabilir, bilgisayarı kullanabilirsin; seans sürer, pas sayılmaz. Süre bitince tam ekran geri gelir. |
 | ![Tamamlandı](docs/4-tamamlandi.png) | **Bitince:** Bugün kaçıncı seans olduğu ve toplam spor süresi. |
-| ![Uyku hazırlığı](docs/5-uyku-hazirlik.png) | **23:30:** "Uyumak için hazırlıklarını yap." |
+| ![Uyku hazırlığı](docs/5-uyku-hazirlik.png) | **23:30:** "Uyumak için hazırlıklarını yap." (Uyku uyarıları ayarlardan kapatılabilir.) |
 | ![Uyku vakti](docs/6-uyku-vakti.png) | **23:59:** "Uyku vakti." Gece uyarıları yalnızca **Tamam** ile kapanır. |
 
 ### Ne zaman görünmez
@@ -37,7 +37,7 @@ Sana ne yapacağını söylemez. Ama sana sorar: **gerçekten yapıyor musun, yo
 - **Ekran paylaşırken:** Zoom paylaşımı ya da Chrome'un paylaşım çubuğu varsa uyarı açılmaz. Pencereler ayrıca ekran yakalamadan hariç tutulacak şekilde işaretlenir. Karşı taraf görmez.
 - Ekran kilitliyken, ekran koruyucu açıkken, 10 dakikadan uzun süredir klavye ya da fare kullanılmıyorsa.
 - Bilgisayar uykudan geç uyandıysa (uyarı dakikasının üzerinden 5 dakika geçtiyse).
-- Gece 00:00–07:00 arası spor uyarısı yok.
+- Spor saatlerinin dışında (varsayılan 07:00–23:00; ayarlardan değişir).
 - Duraklatılmışken.
 
 5 dakika içinde cevap verilmezse seans **cevapsız** (pas) sayılır.
@@ -71,8 +71,10 @@ Spor ekranında sağ üstteki **Ayarlar** düğmesine bas (ya da `A`), veya iste
 
 | Ayar | Seçenekler | Varsayılan |
 |---|---|---|
-| **Spor aralığı** | Kaç saat + kaç dakikada bir (5 dk adımlarla, en az 15 dk). Uyarılar 07:00'den başlar ve bu aralıkla tekrar eder: 1 saat 30 dk → 07:00, 08:30, 10:00… | 1 saat |
+| **Spor saatleri** | Başlangıç ve bitiş saati (5 dk adımlarla). Spor uyarıları yalnızca bu saatler arasında gelir. | 07:00 – 23:00 |
+| **Spor aralığı** | Kaç saat + kaç dakikada bir (5 dk adımlarla, en az 15 dk). Uyarılar başlangıç saatinden itibaren bu aralıkla tekrar eder: 09:00 ve 1 saat 30 dk → 09:00, 10:30, 12:00… Ekran örnek düzeni ve günde kaç uyarı geleceğini gösterir. | 1 saat |
 | **Spor süresi** | 1–60 dakika | 10 dk |
+| **Uyku uyarıları** | 23:30 "Uyku hazırlığı" ve 23:59 "Uyku vakti" ekranları: açık / kapalı | Açık |
 | **Müzik** | Spor boyunca müzik çal: açık / kapalı | Açık |
 
 Kaydettiğin an geçerli olur; yeniden kurman gerekmez.
@@ -112,19 +114,19 @@ It doesn't tell you what to do. It asks: **are you actually doing it, or skippin
 
 ### How it works
 
-- **On your schedule (default: every hour, 07:00–23:00):** a full-screen "Spor vakti." prompt with today's tally (sessions, minutes, skips). The **Ayarlar** (Settings) button in the top-right corner (or `A`) opens the settings right there; a new session length applies immediately.
+- **On your schedule (default: every hour, 07:00–23:00):** a full-screen "Spor vakti." prompt with today's tally (sessions, minutes, skips). The **Ayarlar** (Settings) button in the top-right corner (or `A`) opens the settings right there (hours, interval, length, music); a new session length applies immediately.
 - **Not now?** **5 dk ertele** (or `E`) snoozes 5 minutes without counting as a skip, and shifts the rest of the day's schedule by 5 minutes too (snooze 14:00 → 14:05, next one at 15:05). Each snooze adds another 5; the next day starts on the hour again.
 - **Skip?** A confirmation screen shows the cost ("This will be skip #2 today, 20 minutes missed"). Typing **evet** ("yes") unlocks the **Pas geç** (Skip) button; **Spora başla** (Start) is always there. Your choice is recorded explicitly.
 - **Start?** A countdown (10 minutes by default) and **the workout music kicks in**; it fades out when time is up. Ending early still counts the missing minutes. **Küçült · müzik aç** (or `M`) shrinks it to a small corner timer so you can put on music or use the computer; the session keeps running and is not a skip. It returns to full screen when time is up.
 - **Done:** today's session count and total exercise time.
-- **23:30:** "Get ready for bed." **23:59:** "Bedtime." Night notices close only with **Tamam** (OK).
+- **23:30:** "Get ready for bed." **23:59:** "Bedtime." Night notices close only with **Tamam** (OK), and can be turned off in settings.
 
 ### When it stays hidden
 
 - **On a call:** if any app is capturing the microphone (Zoom, Google Meet, Teams…).
 - **While screen sharing:** Zoom sharing or Chrome's sharing bar detected. The windows are also excluded from screen capture where supported, so the people you share with don't see the reminder.
 - Screen locked, screensaver running, or no keyboard or mouse activity for 10+ minutes.
-- Late wake from sleep, quiet hours (00:00–07:00 for workout prompts), or paused.
+- Late wake from sleep, outside your workout hours (default 07:00–23:00, set in settings), or paused.
 
 No answer within 5 minutes counts as a skip.
 
@@ -148,8 +150,10 @@ Press **Ayarlar** (or `A`) on the workout prompt, or double-click `ayarlar.comma
 
 | Setting | Options | Default |
 |---|---|---|
-| **Interval** (Spor aralığı) | Hours + minutes, 5-minute steps, at least 15 min. Prompts start at 07:00 and repeat: 1 h 30 min → 07:00, 08:30, 10:00… | 1 hour |
+| **Workout hours** (Spor saatleri) | Start and end time, 5-minute steps. Workout prompts only appear in this window. | 07:00 – 23:00 |
+| **Interval** (Spor aralığı) | Hours + minutes, 5-minute steps, at least 15 min. Prompts repeat from the start time: 09:00 and 1 h 30 min → 09:00, 10:30, 12:00… The window previews the schedule and how many prompts you'll get per day. | 1 hour |
 | **Session length** (Spor süresi) | 1–60 minutes | 10 min |
+| **Sleep notices** (Uyku uyarıları) | The 23:30 "Get ready for bed" and 23:59 "Bedtime" screens: on / off | On |
 | **Music** (Müzik) | Play music during the session: on / off | On |
 
 Changes apply as soon as you save; no reinstall needed.

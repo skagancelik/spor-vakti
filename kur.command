@@ -53,5 +53,5 @@ PL
 
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
-echo "✅ Kuruldu. 07:00–23:00 arası spor uyarısı (varsayılan saat başı; ertelersen o günkü düzen 5 dk kayar), 23:30 ve 23:59'da uyku uyarısı gelecek."
+echo "✅ Kuruldu. Spor uyarıları ayarladığın saatlerde gelir (varsayılan 07:00–23:00, saat başı), uyku uyarıları 23:30 ve 23:59'da."
 echo "   Aralık, süre ve müzik için: ayarlar.command   ·   Denemek için: deneme.command"

@@ -5,7 +5,7 @@
 #           run.sh --deneme                (koşulsuz, 20 sn'lik kayıtsız spor denemesi)
 #           run.sh --deneme uyku-hazirlik  (koşulsuz gece uyarısı denemesi; "uyku" da olur)
 APP_DIR="$HOME/Applications/SporVakti"
-DATA_DIR="$HOME/Library/Application Support/SporVakti"
+DATA_DIR="${SPOR_VAKTI_DATA:-$HOME/Library/Application Support/SporVakti}"
 BIN="$APP_DIR/spor-vakti"
 LOG="$DATA_DIR/olaylar.log"
 mkdir -p "$DATA_DIR"
@@ -13,17 +13,29 @@ mkdir -p "$DATA_DIR"
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S')  $*" >> "$LOG"; }
 
 ARGS=("$@")
+# --kuru: yalnızca kararı yazar, ekran açmaz (SPOR_VAKTI_SIMDI=SS:DD ile saat verilebilir; test için)
+KURU=0
+if [ "$1" = "--kuru" ]; then KURU=1; ARGS=(); shift; fi
+karar() { if [ "$KURU" = 1 ]; then echo "$*"; exit 0; fi; }
+
 if [ "$1" != "--deneme" ]; then
   if [ -f "$DATA_DIR/DURAKLAT" ]; then log "atlandı: duraklatılmış"; exit 0; fi
 
-  HOUR=$((10#$(date +%H))); MIN=$((10#$(date +%M)))
+  NOW_HM="${SPOR_VAKTI_SIMDI:-$(date +%H:%M)}"
+  HOUR=$((10#${NOW_HM%:*})); MIN=$((10#${NOW_HM#*:}))
+  NOW=$(( HOUR * 60 + MIN ))
 
-  # Spor aralığı (dakika): ayar ekranında seçilir (ayarlar.command). Varsayılan 60 = saat başı.
-  INTERVAL=60
-  if [ -f "$DATA_DIR/ayarlar" ]; then
-    V=$(sed -n 's/^aralik_dk=\([0-9][0-9]*\)$/\1/p' "$DATA_DIR/ayarlar" | tail -1)
-    if [ -n "$V" ] && [ $((10#$V)) -ge 15 ]; then INTERVAL=$((10#$V)); fi
-  fi
+  # Ayarlar (ayarlar.command ya da spor ekranındaki Ayarlar düğmesi yazar)
+  ayar() {  # ayar <anahtar> <varsayılan>
+    local v=""
+    [ -f "$DATA_DIR/ayarlar" ] && v=$(sed -n "s/^$1=\([0-9][0-9]*\)$/\1/p" "$DATA_DIR/ayarlar" | tail -1)
+    if [ -n "$v" ]; then echo $((10#$v)); else echo "$2"; fi
+  }
+  INTERVAL=$(ayar aralik_dk 60);   [ "$INTERVAL" -lt 15 ] && INTERVAL=60
+  START=$(ayar baslangic_dk 420)   # 07:00
+  END=$(ayar bitis_dk 1380)        # 23:00 (dahil)
+  SLEEP=$(ayar uyku_uyarisi 1)
+  if [ "$START" -ge 1440 ] || [ "$END" -ge 1440 ] || [ "$END" -le "$START" ]; then START=420; END=1380; fi
 
   # Erteleme: her "5 dk ertele" o günün düzenini 5 dk kaydırır
   # (14:00 → 14:05 ertelenirse sonraki 15:05'te gelir). Ertesi gün sıfırlanır.
@@ -32,22 +44,27 @@ if [ "$1" != "--deneme" ]; then
     IFS=, read -r SDAY SMIN < "$DATA_DIR/erteleme"
     if [ "$SDAY" = "$(date +%Y-%m-%d)" ] && [[ "$SMIN" =~ ^[0-9]+$ ]]; then SHIFT=$((10#$SMIN % INTERVAL)); fi
   fi
-  # Uyarılar 07:00'den başlayıp INTERVAL dakikada bir gelir.
+  # Uyarılar başlangıç saatinden itibaren INTERVAL dakikada bir gelir.
   # launchd 5 dakikada bir çağırır; yalnızca spor dakikasındaysak devam et.
-  ELAPSED=$(( HOUR * 60 + MIN - 7 * 60 - SHIFT ))
+  ELAPSED=$(( NOW - START - SHIFT ))
   DELTA=$(( (ELAPSED % INTERVAL + INTERVAL) % INTERVAL ))
 
-  if [ "$HOUR" -eq 23 ] && [ "$MIN" -ge 30 ] && [ "$MIN" -lt 35 ]; then
+  if [ "$SLEEP" = 1 ] && [ "$HOUR" -eq 23 ] && [ "$MIN" -ge 30 ] && [ "$MIN" -lt 35 ]; then
     ARGS=(uyku-hazirlik)
-  elif [ "$HOUR" -eq 23 ] && [ "$MIN" -ge 59 ]; then
+  elif [ "$SLEEP" = 1 ] && [ "$HOUR" -eq 23 ] && [ "$MIN" -ge 59 ]; then
     ARGS=(uyku)
+  elif [ "$HOUR" -eq 23 ] && [ "$MIN" -ge 59 ]; then
+    karar "sessiz"; exit 0  # 23:59 yalnızca uyku uyarısı içindir
   elif [ "$DELTA" -ge 5 ]; then
-    exit 0  # spor dakikası değil (sessizce çık, log şişmesin)
-  elif [ "$HOUR" -lt 7 ]; then
-    log "atlandı: gece (spor uyarısı 07:00'den önce gösterilmez)"; exit 0
-  elif [ "$HOUR" -eq 23 ] && [ "$MIN" -ge 30 ]; then
-    log "atlandı: gece uyarısı saati (:$MIN)"; exit 0
+    karar "sessiz"; exit 0  # spor dakikası değil (sessizce çık, log şişmesin)
+  elif [ "$NOW" -lt "$START" ]; then
+    karar "atla: başlangıçtan önce"; log "atlandı: spor saatleri dışında (başlangıçtan önce)"; exit 0
+  elif [ "$NOW" -ge $(( END + 5 )) ]; then
+    karar "atla: bitişten sonra"; log "atlandı: spor saatleri dışında (bitişten sonra)"; exit 0
+  elif [ "$SLEEP" = 1 ] && [ "$HOUR" -eq 23 ] && [ "$MIN" -ge 30 ]; then
+    karar "atla: gece uyarısı saati"; log "atlandı: gece uyarısı saati (:$MIN)"; exit 0
   fi
+  karar "${ARGS[*]:-spor}"
 
   # Zoom ekran paylaşırken CptHost süreci çalışır — karşı taraf uyarıyı görmesin
   if pgrep -x CptHost >/dev/null 2>&1; then
