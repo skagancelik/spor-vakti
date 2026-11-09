@@ -91,6 +91,7 @@ Spor ekranında sağ üstteki **Ayarlar** düğmesine bas (ya da `A`), veya iste
 | **Spor süresi** | 1–60 dakika | 10 dk |
 | **Uyku uyarıları** | 23:30 "Uyku hazırlığı" ve 23:59 "Uyku vakti" ekranları: açık / kapalı | Açık |
 | **Hareket önerileri** | Spor sırasında dakikada bir değişen hareket: açık / kapalı | Açık |
+| **Dil** | Sistem dili / Türkçe / English | Sistem dili |
 | **Masadan zaten kalktıysan uyarma** | Son aralıkta 5 dakikadan uzun bilgisayardan uzaktaysan o uyarıyı atla | Açık |
 | **Müzik** | Spor boyunca müzik çal: açık / kapalı, ses seviyesi (%10–100) | Açık, %80 |
 
@@ -119,6 +120,8 @@ Ayarlar `~/Library/Application Support/SporVakti/ayarlar` dosyasında durur. `SP
 ---
 
 ## English
+
+The app speaks English or Turkish: it follows your system language, and you can pick one in settings. (Screenshots below are from the Turkish UI.)
 
 Hours slip by at the desk. **Spor Vakti** ("workout time" in Turkish) takes over your screen on a schedule you choose (by default, every hour) and says just one thing: *Time to move.*
 
@@ -189,6 +192,7 @@ Press **Ayarlar** (or `A`) on the workout prompt, or double-click `ayarlar.comma
 | **Session length** (Spor süresi) | 1–60 minutes | 10 min |
 | **Sleep notices** (Uyku uyarıları) | The 23:30 "Get ready for bed" and 23:59 "Bedtime" screens: on / off | On |
 | **Move suggestions** (Hareket önerileri) | A new move every minute during the session: on / off | On |
+| **Language** (Dil) | System language / Türkçe / English | System language |
 | **Skip if already up** (Masadan zaten kalktıysan uyarma) | Skip the prompt if you were away for 5+ minutes during the last interval | On |
 | **Music** (Müzik) | Play music during the session: on / off, volume (10–100%) | On, 80% |
 

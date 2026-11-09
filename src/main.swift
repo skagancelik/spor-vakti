@@ -51,6 +51,8 @@ struct Settings {
     var moves = true
     /// Son aralıkta 5 dk'dan uzun masadan uzaktaysan uyarı gelmez (zaten kalktın)
     var skipIfAway = true
+    /// Arayüz dili: "auto" (sistem dili), "tr" ya da "en"
+    var language = "auto"
 
     static let url = DATA_DIR.appendingPathComponent("ayarlar")
     static let minInterval = 15
@@ -71,6 +73,7 @@ struct Settings {
             case "ses":          if let v = Int(kv[1]) { s.volume = min(100, max(10, v)) }
             case "hareket":      s.moves = kv[1] != "0"
             case "kalkinca_atla": s.skipIfAway = kv[1] != "0"
+            case "dil":          if ["auto", "tr", "en"].contains(kv[1]) { s.language = kv[1] }
             default: break
             }
         }
@@ -81,11 +84,21 @@ struct Settings {
         let text = "aralik_dk=\(intervalMin)\nsure_dk=\(sessionMin)\nmuzik=\(music ? 1 : 0)\n"
             + "baslangic_dk=\(startMin)\nbitis_dk=\(endMin)\nuyku_uyarisi=\(sleepNotices ? 1 : 0)\n"
             + "ses=\(volume)\nhareket=\(moves ? 1 : 0)\nkalkinca_atla=\(skipIfAway ? 1 : 0)\n"
+            + "dil=\(language)\n"
         try text.write(to: Settings.url, atomically: true, encoding: .utf8)
     }
 }
 
 var settings = Settings.load()
+
+/// Arayüz İngilizce mi: ayarlardaki dil, "auto" ise sistemin tercih ettiği dil (Türkçe değilse İngilizce)
+var EN: Bool {
+    if settings.language == "tr" { return false }
+    if settings.language == "en" { return true }
+    return !(Locale.preferredLanguages.first ?? "tr").hasPrefix("tr")
+}
+/// Türkçe / İngilizce metin seçici
+func T(_ tr: String, _ en: String) -> String { EN ? en : tr }
 
 /// Bir seansın süresi (dakika). Ayar ekranından seçilir; SPOR_VAKTI_DK ortam değişkeni hepsinin önüne geçer.
 var SESSION_MIN: Int = max(1, Int(env["SPOR_VAKTI_DK"] ?? "") ?? settings.sessionMin)
@@ -252,8 +265,8 @@ func nextPrompt(from now: Date = Date(), s: Settings = settings) -> Date {
 if args.first == "rapor" {
     let all = journal.all()
     let cal = Calendar.current
-    print("\nSPOR VAKTİ — son 7 gün\n")
-    print("Tarih        Seans  Spor   Pas  Mahrum")
+    print(T("\nSPOR VAKTİ — son 7 gün\n", "\nSPOR VAKTI — last 7 days\n"))
+    print(T("Tarih        Seans  Spor   Pas  Mahrum", "Date      Sessions  Exer.  Skip  Missed"))
     print("──────────   ─────  ─────  ───  ──────")
     var total = DayStats([])
     for back in (0..<7).reversed() {
@@ -265,8 +278,8 @@ if args.first == "rapor" {
         print(String(format: "%@   %5d  %3d dk  %3d  %3d dk", key, s.sessions, s.sportMin, s.passes, s.missedMin))
     }
     print("──────────   ─────  ─────  ───  ──────")
-    print(String(format: "Toplam       %5d  %3d dk  %3d  %3d dk\n", total.sessions, total.sportMin, total.passes, total.missedMin))
-    print("Kayıt dosyası: \(journal.url.path)\n")
+    print(String(format: T("Toplam       %5d", "Total        %5d") + "  %3d dk  %3d  %3d dk\n", total.sessions, total.sportMin, total.passes, total.missedMin))
+    print(T("Kayıt dosyası: ", "Log file: ") + "\(journal.url.path)\n")
     exit(0)
 }
 
@@ -405,14 +418,14 @@ final class MusicPlayer: NSObject, AVAudioPlayerDelegate {
 
 struct Move { let name: String; let how: String }
 let MOVES: [Move] = [
-    Move(name: "Sandalyeden kalk, otur", how: "Sandalyenin önünde dur; oturur gibi in, dokunmadan kalk. Sırtın dik."),
-    Move(name: "Masaya dayanarak şınav", how: "Ellerini masanın kenarına koy, gövdeni düz tutarak in ve it."),
-    Move(name: "Parmak ucunda yüksel", how: "Topuklarını kaldır, bir saniye bekle, yavaşça indir."),
-    Move(name: "Yerinde diz çek", how: "Dizlerini sırayla bel hizasına kaldır; kollar da eşlik etsin."),
-    Move(name: "Duvarda otur", how: "Sırtını duvara daya, dizlerin 90 derece olana kadar in, bekle."),
-    Move(name: "Omuz çevir", how: "Omuzlarını büyük daireler çizerek geriye, sonra öne çevir."),
-    Move(name: "Göğsünü aç", how: "Ellerini arkada birleştir, göğsünü öne it, derin nefes al."),
-    Move(name: "Tempolu yürü", how: "Odada ya da koridorda hızlı adımlarla yürü."),
+    Move(name: T("Sandalyeden kalk, otur", "Chair squats"), how: T("Sandalyenin önünde dur; oturur gibi in, dokunmadan kalk. Sırtın dik.", "Stand in front of your chair; lower as if to sit, rise before touching it. Keep your back straight.")),
+    Move(name: T("Masaya dayanarak şınav", "Desk push-ups"), how: T("Ellerini masanın kenarına koy, gövdeni düz tutarak in ve it.", "Hands on the edge of the desk; keep your body straight, lower and push back up.")),
+    Move(name: T("Parmak ucunda yüksel", "Calf raises"), how: T("Topuklarını kaldır, bir saniye bekle, yavaşça indir.", "Rise onto your toes, hold for a second, lower slowly.")),
+    Move(name: T("Yerinde diz çek", "High knees"), how: T("Dizlerini sırayla bel hizasına kaldır; kollar da eşlik etsin.", "Bring your knees up to hip height in turn; swing your arms too.")),
+    Move(name: T("Duvarda otur", "Wall sit"), how: T("Sırtını duvara daya, dizlerin 90 derece olana kadar in, bekle.", "Back against the wall, slide down until your knees are at 90 degrees, hold.")),
+    Move(name: T("Omuz çevir", "Shoulder rolls"), how: T("Omuzlarını büyük daireler çizerek geriye, sonra öne çevir.", "Roll your shoulders in big circles backwards, then forwards.")),
+    Move(name: T("Göğsünü aç", "Chest opener"), how: T("Ellerini arkada birleştir, göğsünü öne it, derin nefes al.", "Clasp your hands behind you, push your chest forward, breathe deeply.")),
+    Move(name: T("Tempolu yürü", "Brisk walk"), how: T("Odada ya da koridorda hızlı adımlarla yürü.", "Walk briskly around the room or down the hall.")),
 ]
 /// Bir hareketin süresi (saniye)
 let MOVE_SEC: Double = isTrial ? 5 : 60
@@ -463,7 +476,7 @@ final class ActionButton: NSButton {
 }
 
 func isYes(_ text: String) -> Bool {
-    text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(with: Locale(identifier: "tr_TR")) == "evet"
+    ["evet", "yes"].contains(text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(with: Locale(identifier: "tr_TR")))
 }
 
 /// Enter'a basılınca handler'ı çağıran yazı kutusu
@@ -478,7 +491,7 @@ final class EntryField: NSTextField {
         alignment = .center
         textColor = C_WHITE
         font = NSFont.systemFont(ofSize: fontSize, weight: .semibold)
-        placeholderAttributedString = NSAttributedString(string: "evet", attributes: [
+        placeholderAttributedString = NSAttributedString(string: T("evet", "yes"), attributes: [
             .font: NSFont.systemFont(ofSize: fontSize, weight: .regular),
             .foregroundColor: C_FAINT,
             .paragraphStyle: { let ps = NSMutableParagraphStyle(); ps.alignment = .center; return ps }()
@@ -634,24 +647,24 @@ final class Controller {
     func showNotice(_ n: Notice) {
         phase = .notice
         let hour = Journal.timeFmt.string(from: triggeredAt)
-        let title = n == .prepare ? "Uyku hazırlığı." : "Uyku vakti."
-        let line = n == .prepare ? "Uyumak için hazırlıklarını yap." : "Bilgisayarı kapat, iyi geceler."
+        let title = n == .prepare ? T("Uyku hazırlığı.", "Wind down.") : T("Uyku vakti.", "Bedtime.")
+        let line = n == .prepare ? T("Uyumak için hazırlıklarını yap.", "Start getting ready for bed.") : T("Bilgisayarı kapat, iyi geceler.", "Shut the computer down. Good night.")
         let t = todayStats()
-        let footer = "Bugün: \(t.sessions) seans · \(t.sportMin) dk spor · \(t.passes) pas"
+        let footer = T("Bugün: \(t.sessions) seans · \(t.sportMin) dk spor · \(t.passes) pas", "Today: \(t.sessions) sessions · \(t.sportMin) min exercise · \(t.passes) skipped")
 
         render { cv, _ in
             let s = cv.s, cy = cv.cy
-            cv.view.addSubview(label("SAAT \(hour)", 14 * s, .semibold, C_NIGHT, cv.row(cy + 210 * s, 26 * s), tracking: 3))
+            cv.view.addSubview(label(T("SAAT ", "TIME ") + hour, 14 * s, .semibold, C_NIGHT, cv.row(cy + 210 * s, 26 * s), tracking: 3))
             cv.view.addSubview(label(title, 104 * s, .bold, C_WHITE, cv.row(cy + 64 * s, 134 * s)))
             cv.view.addSubview(label(line, 28 * s, .medium, C_NIGHT, cv.row(cy + 8 * s, 42 * s)))
             cv.view.addSubview(label(footer, 19 * s, .regular, C_MUTED, cv.row(cy - 40 * s, 30 * s)))
             let bw = 220 * s, bh = 62 * s
-            let ok = ActionButton("Tamam", primary: true,
+            let ok = ActionButton(T("Tamam", "OK"), primary: true,
                                   frame: NSRect(x: (cv.w - bw) / 2, y: cy - 150 * s, width: bw, height: bh),
                                   fontSize: 22 * s, color: C_NIGHT)
             ok.handler = { [weak self] in self?.quit() }
             cv.view.addSubview(ok)
-            cv.view.addSubview(label("Enter  tamam", 13 * s, .regular, C_FAINT, cv.row(58, 22), tracking: 1.2))
+            cv.view.addSubview(label(T("Enter  tamam", "Enter  OK"), 13 * s, .regular, C_FAINT, cv.row(58, 22), tracking: 1.2))
         }
         NSSound(named: "Purr")?.play()
     }
@@ -664,32 +677,32 @@ final class Controller {
         let hour = Journal.timeFmt.string(from: triggeredAt)
         let tally: String
         if today.sessions + today.passes == 0 {
-            tally = "Bugünün ilk seansı."
+            tally = T("Bugünün ilk seansı.", "First session of the day.")
         } else {
-            tally = "Bugün: \(today.sessions) seans · \(today.sportMin) dk spor · \(today.passes) pas"
+            tally = T("Bugün: \(today.sessions) seans · \(today.sportMin) dk spor · \(today.passes) pas", "Today: \(today.sessions) sessions · \(today.sportMin) min exercise · \(today.passes) skipped")
         }
 
         render { cv, _ in
             let s = cv.s, cy = cv.cy
-            cv.view.addSubview(label("SAAT \(hour)" + (isTrial ? "  ·  DENEME" : ""), 14 * s, .semibold, C_FAINT,
+            cv.view.addSubview(label(T("SAAT ", "TIME ") + hour + (isTrial ? T("  ·  DENEME", "  ·  TRIAL") : ""), 14 * s, .semibold, C_FAINT,
                                      cv.row(cy + 210 * s, 26 * s), tracking: 3))
-            cv.view.addSubview(label("Spor vakti.", 112 * s, .bold, C_WHITE,
+            cv.view.addSubview(label(T("Spor vakti.", "Time to move."), 112 * s, .bold, C_WHITE,
                                      cv.row(cy + 64 * s, 140 * s)))
             cv.view.addSubview(label(tally, 22 * s, .regular, C_MUTED,
                                      cv.row(cy + 14 * s, 34 * s)))
 
             let bw = 300 * s, bh = 66 * s, gap = 22 * s
             let x0 = (cv.w - (bw * 2 + gap)) / 2, by = cy - 110 * s
-            let go = ActionButton("Başlıyorum · \(isTrial ? "20 sn" : "\(SESSION_MIN) dk")", primary: true,
+            let go = ActionButton(T("Başlıyorum", "Let's go") + " · \(isTrial ? T("20 sn", "20 s") : "\(SESSION_MIN) \(T("dk", "min"))")", primary: true,
                                   frame: NSRect(x: x0, y: by, width: bw, height: bh), fontSize: 22 * s)
             go.handler = { [weak self] in self?.startWorkout() }
-            let pass = ActionButton("Pas geçiyorum", primary: false,
+            let pass = ActionButton(T("Pas geçiyorum", "Skip this one"), primary: false,
                                     frame: NSRect(x: x0 + bw + gap, y: by, width: bw, height: bh), fontSize: 22 * s)
             pass.handler = { [weak self] in self?.askToSkip() }
             cv.view.addSubview(go); cv.view.addSubview(pass)
 
             let sw = 220 * s, sh = 50 * s
-            let later = ActionButton("\(SNOOZE_MIN) dk ertele", primary: false,
+            let later = ActionButton(T("\(SNOOZE_MIN) dk ertele", "Snooze \(SNOOZE_MIN) min"), primary: false,
                                      frame: NSRect(x: (cv.w - sw) / 2, y: by - sh - 24 * s, width: sw, height: sh),
                                      fontSize: 17 * s)
             later.handler = { [weak self] in self?.snooze() }
@@ -697,13 +710,13 @@ final class Controller {
 
             // Sağ üst köşede, göze batmayan ayar düğmesi
             let aw = 132 * s, ah = 40 * s, m = 28 * s
-            let gear = ActionButton("Ayarlar", primary: false,
+            let gear = ActionButton(T("Ayarlar", "Settings"), primary: false,
                                     frame: NSRect(x: cv.w - aw - m, y: cv.h - ah - m - 24, width: aw, height: ah),
                                     fontSize: 15 * s)
             gear.handler = { [weak self] in self?.openSettings() }
             cv.view.addSubview(gear)
 
-            cv.view.addSubview(label("Enter  başla        E  ertele        A  ayarlar        Esc  pas geç", 13 * s, .regular,
+            cv.view.addSubview(label(T("Enter  başla        E  ertele        A  ayarlar        Esc  pas geç", "Enter  start        E  snooze        A  settings        Esc  skip"), 13 * s, .regular,
                                      C_FAINT, cv.row(58, 22), tracking: 1.2))
         }
         guard first else { return }
@@ -760,11 +773,11 @@ final class Controller {
 
         render { cv, i in
             let s = cv.s, cy = cv.cy
-            cv.view.addSubview(label("EMİN MİSİN?", 14 * s, .semibold, C_WARN, cv.row(cy + 230 * s, 26 * s), tracking: 3))
-            cv.view.addSubview(label("Bugün \(n). pas olacak.", 84 * s, .bold, C_WHITE, cv.row(cy + 104 * s, 110 * s)))
-            cv.view.addSubview(label("Bugün toplam \(missed) dakika spordan mahrum kalacaksın.", 28 * s, .medium, C_WARN,
+            cv.view.addSubview(label(T("EMİN MİSİN?", "ARE YOU SURE?"), 14 * s, .semibold, C_WARN, cv.row(cy + 230 * s, 26 * s), tracking: 3))
+            cv.view.addSubview(label(T("Bugün \(n). pas olacak.", "Skip #\(n) today."), 84 * s, .bold, C_WHITE, cv.row(cy + 104 * s, 110 * s)))
+            cv.view.addSubview(label(T("Bugün toplam \(missed) dakika spordan mahrum kalacaksın.", "That's \(missed) minutes of exercise missed today."), 28 * s, .medium, C_WARN,
                                      cv.row(cy + 50 * s, 42 * s)))
-            let hint = label("Pas geçmek için  evet  yaz, sonra  Pas geç  düğmesine bas.", 19 * s, .regular, C_MUTED,
+            let hint = label(T("Pas geçmek için  evet  yaz, sonra  Pas geç  düğmesine bas.", "To skip, type  yes  and then press  Skip."), 19 * s, .regular, C_MUTED,
                              cv.row(cy - 2 * s, 30 * s))
             cv.view.addSubview(hint)
             self.confirmHints.append(hint)
@@ -791,18 +804,18 @@ final class Controller {
             // İki net seçenek: hangisine basıldıysa o kaydedilir
             let bw = 260 * s, bh = 60 * s, gap = 22 * s
             let x0 = (cv.w - (bw * 2 + gap)) / 2, by = cy - 190 * s
-            let pass = ActionButton("Pas geç", primary: true,
+            let pass = ActionButton(T("Pas geç", "Skip"), primary: true,
                                     frame: NSRect(x: x0, y: by, width: bw, height: bh),
                                     fontSize: 21 * s, color: C_WARN)
             pass.handler = { [weak self] in self?.confirmSkip() }
             pass.setActive(false)
             self.passButtons.append(pass)
-            let go = ActionButton("Spora başla", primary: true,
+            let go = ActionButton(T("Spora başla", "Start exercising"), primary: true,
                                   frame: NSRect(x: x0 + bw + gap, y: by, width: bw, height: bh), fontSize: 21 * s)
             go.handler = { [weak self] in self?.startWorkout() }
             cv.view.addSubview(pass); cv.view.addSubview(go)
 
-            cv.view.addSubview(label("Esc  geri dön", 13 * s, .regular, C_FAINT, cv.row(58, 22), tracking: 1.2))
+            cv.view.addSubview(label(T("Esc  geri dön", "Esc  go back"), 13 * s, .regular, C_FAINT, cv.row(58, 22), tracking: 1.2))
         }
         if let f = field { windows.first?.makeFirstResponder(f) }
     }
@@ -829,10 +842,10 @@ final class Controller {
         guard phase == .confirm else { return }
         let message: String
         if isYes(text) {
-            message = "Şimdi seç:  Pas geç  ya da  Spora başla."
+            message = T("Şimdi seç:  Pas geç  ya da  Spora başla.", "Now choose:  Skip  or  Start exercising.")
         } else {
             NSSound(named: "Funk")?.play()
-            message = "Sadece  evet  yazarsan pas geçebilirsin."
+            message = T("Sadece  evet  yazarsan pas geçebilirsin.", "You can only skip by typing  yes.")
             (windows.first?.firstResponder as? NSTextView)?.string = ""
             passButtons.forEach { $0.setActive(false) }
         }
@@ -852,7 +865,7 @@ final class Controller {
         let withMusic = settings.music && !musicFiles().isEmpty
         render { cv, _ in
             let s = cv.s, cy = cv.cy
-            cv.view.addSubview(label(isTrial ? "SPOR  ·  DENEME" : "SPOR  ·  \(SESSION_MIN) DAKİKA", 14 * s, .semibold,
+            cv.view.addSubview(label(isTrial ? T("SPOR  ·  DENEME", "EXERCISE  ·  TRIAL") : T("SPOR  ·  \(SESSION_MIN) DAKİKA", "EXERCISE  ·  \(SESSION_MIN) MINUTES"), 14 * s, .semibold,
                                      C_FAINT, cv.row(cy + 190 * s, 26 * s), tracking: 3))
             let clock = label("00:00", 150 * s, .medium, C_ACCENT, cv.row(cy - 10 * s, 180 * s), mono: true)
             cv.view.addSubview(clock)
@@ -876,7 +889,7 @@ final class Controller {
                 cv.view.addSubview(name); cv.view.addSubview(how); cv.view.addSubview(next)
                 self.moveNames.append(name); self.moveHows.append(how); self.moveNexts.append(next)
             } else {
-                cv.view.addSubview(label("Bilgisayar seni bekler.", 22 * s, .regular, C_MUTED,
+                cv.view.addSubview(label(T("Bilgisayar seni bekler.", "The computer can wait."), 22 * s, .regular, C_MUTED,
                                          cv.row(cy - 100 * s, 34 * s)))
             }
 
@@ -886,24 +899,24 @@ final class Controller {
             let x0 = (cv.w - (ew * count + gap * (count - 1))) / 2
             let by = cy - (showMoves ? 250 : 190) * s
             var x = x0
-            let shrink = ActionButton("Küçült · müzik aç", primary: false,
+            let shrink = ActionButton(T("Küçült · müzik aç", "Shrink · play music"), primary: false,
                                       frame: NSRect(x: x, y: by, width: ew, height: eh), fontSize: 17 * s)
             shrink.handler = { [weak self] in self?.minimize() }
             cv.view.addSubview(shrink)
             x += ew + gap
             if withMusic {
-                let skip = ActionButton("Sonraki parça", primary: false,
+                let skip = ActionButton(T("Sonraki parça", "Next track"), primary: false,
                                         frame: NSRect(x: x, y: by, width: ew, height: eh), fontSize: 17 * s)
                 skip.handler = { [weak self] in self?.music.skip() }
                 cv.view.addSubview(skip)
                 x += ew + gap
             }
-            let early = ActionButton("Erken bitir", primary: false,
+            let early = ActionButton(T("Erken bitir", "End early"), primary: false,
                                      frame: NSRect(x: x, y: by, width: ew, height: eh), fontSize: 17 * s)
             early.handler = { [weak self] in self?.finishWorkout(early: true) }
             cv.view.addSubview(early)
 
-            cv.view.addSubview(label("M  küçült" + (withMusic ? "        N  sonraki parça" : "") + "        Esc  erken bitir",
+            cv.view.addSubview(label(T("M  küçült", "M  shrink") + (withMusic ? T("        N  sonraki parça", "        N  next track") : "") + T("        Esc  erken bitir", "        Esc  end early"),
                                      13 * s, .regular, C_FAINT, cv.row(58, 22), tracking: 1.2))
             self.clocks.append(clock); self.fills.append(fill); self.barW.append(bw)
         }
@@ -955,7 +968,8 @@ final class Controller {
         }
         set(moveNames, cur.name)
         set(moveHows, cur.how)
-        set(moveNexts, hasNext ? "SIRADAKİ:  \(cur.name == nxt.name ? "" : nxt.name.uppercased(with: Locale(identifier: "tr_TR")))" : "SON HAREKET")
+        set(moveNexts, hasNext ? T("SIRADAKİ:  ", "NEXT:  ") + nxt.name.uppercased(with: Locale(identifier: EN ? "en_US" : "tr_TR"))
+                                : T("SON HAREKET", "LAST MOVE"))
     }
 
     // MARK: 2b) Küçültülmüş seans — sayaç sürer, bilgisayar kullanılabilir
@@ -985,14 +999,14 @@ final class Controller {
         root.layer?.borderColor = NSColor(white: 1, alpha: 0.12).cgColor
         panel.contentView = root
 
-        root.addSubview(label("SPOR", 10, .semibold, C_FAINT, NSRect(x: 0, y: h - 26, width: w, height: 16), tracking: 2.5))
+        root.addSubview(label(T("SPOR", "EXERCISE"), 10, .semibold, C_FAINT, NSRect(x: 0, y: h - 26, width: w, height: 16), tracking: 2.5))
         let clock = label("00:00", 34, .medium, C_ACCENT, NSRect(x: 0, y: 44, width: w, height: 42), mono: true)
         root.addSubview(clock)
         let bw: CGFloat = 105, bh: CGFloat = 28, gap: CGFloat = 10
         let x0 = (w - (bw * 2 + gap)) / 2
-        let big = ActionButton("Büyüt", primary: false, frame: NSRect(x: x0, y: 12, width: bw, height: bh), fontSize: 13)
+        let big = ActionButton(T("Büyüt", "Expand"), primary: false, frame: NSRect(x: x0, y: 12, width: bw, height: bh), fontSize: 13)
         big.handler = { [weak self] in self?.expand() }
-        let end = ActionButton("Erken bitir", primary: false,
+        let end = ActionButton(T("Erken bitir", "End early"), primary: false,
                                frame: NSRect(x: x0 + bw + gap, y: 12, width: bw, height: bh), fontSize: 13)
         end.handler = { [weak self] in self?.finishWorkout(early: true) }
         root.addSubview(big); root.addSubview(end)
@@ -1052,7 +1066,7 @@ final class Controller {
             cv.view.addSubview(label(title, 96 * s, .bold, C_WHITE, cv.row(cy + 50 * s, 124 * s)))
             cv.view.addSubview(label(line, 30 * s, .medium, lineColor, cv.row(cy - 10 * s, 44 * s)))
             cv.view.addSubview(label(footer, 20 * s, .regular, C_MUTED, cv.row(cy - 70 * s, 32 * s)))
-            cv.view.addSubview(label("Kapatmak için bir tuşa bas ya da tıkla", 13 * s, .regular, C_FAINT,
+            cv.view.addSubview(label(T("Kapatmak için bir tuşa bas ya da tıkla", "Press any key or click to close"), 13 * s, .regular, C_FAINT,
                                      cv.row(58, 22), tracking: 1.2))
         }
         Timer.scheduledTimer(withTimeInterval: SUMMARY_SEC, repeats: false) { [weak self] _ in self?.quit() }
@@ -1066,33 +1080,33 @@ final class Controller {
     func showPassSummary() {
         let t = todayStats()
         let n = max(1, t.passes)
-        summary(kicker: "PAS GEÇİLDİ", kickerColor: C_WARN,
-                title: "Bugün \(n). pas.",
-                line: "Bugün toplam \(max(t.missedMin, SESSION_MIN)) dakika spordan mahrum kaldın.",
+        summary(kicker: T("PAS GEÇİLDİ", "SKIPPED"), kickerColor: C_WARN,
+                title: T("Bugün \(n). pas.", "Skip #\(n) today."),
+                line: T("Bugün toplam \(max(t.missedMin, SESSION_MIN)) dakika spordan mahrum kaldın.", "\(max(t.missedMin, SESSION_MIN)) minutes of exercise missed today."),
                 lineColor: C_WARN,
-                footer: "Bugün yapılan: \(t.sessions) seans · \(t.sportMin) dk spor")
+                footer: T("Bugün yapılan: \(t.sessions) seans · \(t.sportMin) dk spor", "Done today: \(t.sessions) sessions · \(t.sportMin) min exercise"))
     }
 
     func showPartial(_ doneMin: Int) {
         let t = todayStats()
-        summary(kicker: "ERKEN BİTTİ", kickerColor: C_WARN,
-                title: "\(doneMin) dk spor.",
-                line: "Bugün toplam \(t.missedMin) dakika spordan mahrum kaldın.",
+        summary(kicker: T("ERKEN BİTTİ", "ENDED EARLY"), kickerColor: C_WARN,
+                title: T("\(doneMin) dk spor.", "\(doneMin) min exercise."),
+                line: T("Bugün toplam \(t.missedMin) dakika spordan mahrum kaldın.", "\(t.missedMin) minutes of exercise missed today."),
                 lineColor: C_WARN,
-                footer: "Bugün: \(t.sessions) seans · \(t.sportMin) dk spor · \(t.passes) pas")
+                footer: T("Bugün: \(t.sessions) seans · \(t.sportMin) dk spor · \(t.passes) pas", "Today: \(t.sessions) sessions · \(t.sportMin) min exercise · \(t.passes) skipped"))
     }
 
     func showDone() {
         let t = todayStats()
         let n = max(1, t.sessions)
-        let missed = t.missedMin > 0 ? " · \(t.missedMin) dk kaçırıldı" : ""
+        let missed = t.missedMin > 0 ? T(" · \(t.missedMin) dk kaçırıldı", " · \(t.missedMin) min missed") : ""
         let streak = journal.streak()
-        let streakText = streak >= 2 ? " · \(streak) gündür her gün spor" : ""
-        summary(kicker: "TAMAMLANDI", kickerColor: C_ACCENT,
-                title: "Bugün \(n). seans.",
-                line: "Bugün toplam \(max(t.sportMin, SESSION_MIN)) dakika spor yaptın.",
+        let streakText = streak >= 2 ? T(" · \(streak) gündür her gün spor", " · \(streak)-day streak") : ""
+        summary(kicker: T("TAMAMLANDI", "DONE"), kickerColor: C_ACCENT,
+                title: T("Bugün \(n). seans.", "Session #\(n) today."),
+                line: T("Bugün toplam \(max(t.sportMin, SESSION_MIN)) dakika spor yaptın.", "\(max(t.sportMin, SESSION_MIN)) minutes of exercise today."),
                 lineColor: C_ACCENT,
-                footer: "\(t.passes) pas\(missed)\(streakText)")
+                footer: T("\(t.passes) pas", "\(t.passes) skipped") + "\(missed)\(streakText)")
     }
 
     func quit() {
@@ -1116,16 +1130,17 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     let endH = NSPopUpButton(frame: .zero, pullsDown: false)
     let endM = NSPopUpButton(frame: .zero, pullsDown: false)
     let schedule = NSTextField(labelWithString: "")
-    let sleepBox = NSButton(checkboxWithTitle: "Uyku uyarıları", target: nil, action: nil)
-    let movesBox = NSButton(checkboxWithTitle: "Hareket önerileri göster", target: nil, action: nil)
-    let awayBox = NSButton(checkboxWithTitle: "Masadan zaten kalktıysan uyarma", target: nil, action: nil)
+    let sleepBox = NSButton(checkboxWithTitle: T("Uyku uyarıları", "Bedtime reminders"), target: nil, action: nil)
+    let movesBox = NSButton(checkboxWithTitle: T("Hareket önerileri göster", "Show move suggestions"), target: nil, action: nil)
+    let lang = NSPopUpButton(frame: .zero, pullsDown: false)
+    let awayBox = NSButton(checkboxWithTitle: T("Masadan zaten kalktıysan uyarma", "Skip if I already got up"), target: nil, action: nil)
     let volume = NSSlider(value: 80, minValue: 10, maxValue: 100, target: nil, action: nil)
     let volumeLabel = NSTextField(labelWithString: "")
     let dur = NSPopUpButton(frame: .zero, pullsDown: false)
-    let musicBox = NSButton(checkboxWithTitle: "Spor boyunca müzik çal", target: nil, action: nil)
+    let musicBox = NSButton(checkboxWithTitle: T("Spor boyunca müzik çal", "Play music during exercise"), target: nil, action: nil)
     let musicInfo = NSTextField(labelWithString: "")
     let warn = NSTextField(labelWithString: "")
-    let saveBtn = NSButton(title: "Kaydet", target: nil, action: nil)
+    let saveBtn = NSButton(title: T("Kaydet", "Save"), target: nil, action: nil)
 
     func text(_ str: String, _ size: CGFloat, _ weight: NSFont.Weight, _ color: NSColor, _ frame: NSRect) -> NSTextField {
         let t = NSTextField(labelWithString: str)
@@ -1136,20 +1151,20 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 
     func show() {
-        let W: CGFloat = 520, H: CGFloat = 716, L: CGFloat = 32, X: CGFloat = 190
+        let W: CGFloat = 520, H: CGFloat = 760, L: CGFloat = 32, X: CGFloat = 190
         win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: W, height: H),
                        styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        win.title = "Spor Vakti · Ayarlar"
+        win.title = T("Spor Vakti · Ayarlar", "Spor Vakti · Settings")
         win.appearance = NSAppearance(named: .darkAqua)
         win.backgroundColor = C_BG1
         win.isReleasedWhenClosed = false
         win.delegate = self
         let v = win.contentView!
 
-        v.addSubview(text("Ayarlar", 24, .bold, C_WHITE, NSRect(x: L, y: H - 62, width: 300, height: 32)))
+        v.addSubview(text(T("Ayarlar", "Settings"), 24, .bold, C_WHITE, NSRect(x: L, y: H - 62, width: 300, height: 32)))
 
         // Saatler: başlangıç – bitiş
-        v.addSubview(text("Spor saatleri", 14, .semibold, C_WHITE, NSRect(x: L, y: H - 112, width: 150, height: 20)))
+        v.addSubview(text(T("Spor saatleri", "Exercise hours"), 14, .semibold, C_WHITE, NSRect(x: L, y: H - 112, width: 150, height: 20)))
         let hh = (0...23).map { String(format: "%02d", $0) }
         let mm = stride(from: 0, through: 55, by: 5).map { String(format: "%02d", $0) }
         for (p, items) in [(startH, hh), (startM, mm), (endH, hh), (endM, mm)] { p.addItems(withTitles: items) }
@@ -1165,9 +1180,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         for p in [startH, startM, endH, endM] { v.addSubview(p) }
 
         // Aralık: saat + dakika
-        v.addSubview(text("Spor aralığı", 14, .semibold, C_WHITE, NSRect(x: L, y: H - 162, width: 150, height: 20)))
-        hours.addItems(withTitles: (0...6).map { "\($0) saat" })
-        mins.addItems(withTitles: stride(from: 0, through: 55, by: 5).map { "\($0) dk" })
+        v.addSubview(text(T("Spor aralığı", "Interval"), 14, .semibold, C_WHITE, NSRect(x: L, y: H - 162, width: 150, height: 20)))
+        hours.addItems(withTitles: (0...6).map { "\($0) " + T("saat", "h") })
+        mins.addItems(withTitles: stride(from: 0, through: 55, by: 5).map { "\($0) " + T("dk", "min") })
         hours.frame = NSRect(x: X, y: H - 166, width: 110, height: 26)
         mins.frame = NSRect(x: X + 118, y: H - 166, width: 110, height: 26)
         let iv = settings.intervalMin
@@ -1181,8 +1196,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         v.addSubview(schedule)
 
         // Süre
-        v.addSubview(text("Spor süresi", 14, .semibold, C_WHITE, NSRect(x: L, y: H - 240, width: 150, height: 20)))
-        dur.addItems(withTitles: (1...60).map { "\($0) dk" })
+        v.addSubview(text(T("Spor süresi", "Session length"), 14, .semibold, C_WHITE, NSRect(x: L, y: H - 240, width: 150, height: 20)))
+        dur.addItems(withTitles: (1...60).map { "\($0) " + T("dk", "min") })
         dur.frame = NSRect(x: X, y: H - 244, width: 110, height: 26)
         dur.selectItem(at: min(60, settings.sessionMin) - 1)
         v.addSubview(dur)
@@ -1192,7 +1207,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         sleepBox.font = .systemFont(ofSize: 14, weight: .semibold)
         sleepBox.state = settings.sleepNotices ? .on : .off
         v.addSubview(sleepBox)
-        v.addSubview(text("23:30'da \u{201C}Uyku hazırlığı\u{201D}, 23:59'da \u{201C}Uyku vakti\u{201D} ekranı.", 12, .regular,
+        v.addSubview(text(T("23:30'da \u{201C}Uyku hazırlığı\u{201D}, 23:59'da \u{201C}Uyku vakti\u{201D} ekranı.", "\u{201C}Wind down\u{201D} at 23:30 and \u{201C}Bedtime\u{201D} at 23:59."), 12, .regular,
                           C_MUTED, NSRect(x: L + 20, y: H - 320, width: W - 2 * L - 20, height: 18)))
 
         // Hareket önerileri
@@ -1200,7 +1215,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         movesBox.font = .systemFont(ofSize: 14, weight: .semibold)
         movesBox.state = settings.moves ? .on : .off
         v.addSubview(movesBox)
-        v.addSubview(text("Spor sırasında dakikada bir yeni hareket önerisi.", 12, .regular,
+        v.addSubview(text(T("Spor sırasında dakikada bir yeni hareket önerisi.", "A new move suggestion every minute during the session."), 12, .regular,
                           C_MUTED, NSRect(x: L + 20, y: H - 396, width: W - 2 * L - 20, height: 18)))
 
         // Masadan kalktıysan
@@ -1208,7 +1223,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         awayBox.font = .systemFont(ofSize: 14, weight: .semibold)
         awayBox.state = settings.skipIfAway ? .on : .off
         v.addSubview(awayBox)
-        v.addSubview(text("Son aralıkta 5 dakikadan uzun bilgisayardan uzaktaysan o uyarı gelmez.", 12, .regular,
+        v.addSubview(text(T("Son aralıkta 5 dakikadan uzun bilgisayardan uzaktaysan o uyarı gelmez.", "No prompt if you were away for 5+ minutes during the last interval."), 12, .regular,
                           C_MUTED, NSRect(x: L + 20, y: H - 472, width: W - 2 * L - 20, height: 18)))
 
         // Müzik
@@ -1217,18 +1232,18 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         musicBox.state = settings.music ? .on : .off
         v.addSubview(musicBox)
         let n = musicFiles().count
-        musicInfo.stringValue = n > 0 ? "\(n) parça bulundu. Karışık sırayla çalar, süre bitince durur."
-                                      : "Henüz parça yok. Klasöre mp3 ekle."
+        musicInfo.stringValue = n > 0 ? T("\(n) parça bulundu. Karışık sırayla çalar, süre bitince durur.", "\(n) tracks found. Plays shuffled, stops when time is up.")
+                                      : T("Henüz parça yok. Klasöre mp3 ekle.", "No tracks yet. Add mp3 files to the folder.")
         musicInfo.font = .systemFont(ofSize: 12)
         musicInfo.textColor = C_MUTED
         musicInfo.frame = NSRect(x: L + 20, y: H - 548, width: W - 2 * L - 20, height: 18)
         v.addSubview(musicInfo)
-        let open = NSButton(title: "Müzik klasörünü aç", target: self, action: #selector(openMusic))
+        let open = NSButton(title: T("Müzik klasörünü aç", "Open music folder"), target: self, action: #selector(openMusic))
         open.bezelStyle = .rounded
         open.frame = NSRect(x: L + 14, y: H - 624, width: 180, height: 30)
         v.addSubview(open)
-        v.addSubview(text("Ses", 13, .medium, C_WHITE, NSRect(x: L + 20, y: H - 582, width: 40, height: 18)))
-        volume.frame = NSRect(x: L + 60, y: H - 586, width: 240, height: 24)
+        v.addSubview(text(T("Ses", "Volume"), 13, .medium, C_WHITE, NSRect(x: L + 20, y: H - 582, width: 60, height: 18)))
+        volume.frame = NSRect(x: L + 84, y: H - 586, width: 216, height: 24)
         volume.integerValue = settings.volume
         volume.target = self; volume.action = #selector(volumeChanged)
         v.addSubview(volume)
@@ -1238,12 +1253,19 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         v.addSubview(volumeLabel)
         volumeChanged()
 
+        // Dil
+        v.addSubview(text(T("Dil", "Language"), 14, .semibold, C_WHITE, NSRect(x: L, y: H - 676, width: 150, height: 20)))
+        lang.addItems(withTitles: [T("Sistem dili", "System language"), "Türkçe", "English"])
+        lang.selectItem(at: ["auto", "tr", "en"].firstIndex(of: settings.language) ?? 0)
+        lang.frame = NSRect(x: X, y: H - 680, width: 180, height: 26)
+        v.addSubview(lang)
+
         warn.font = .systemFont(ofSize: 12, weight: .medium)
         warn.textColor = C_WARN
         warn.frame = NSRect(x: L, y: 70, width: W - 2 * L, height: 18)
         v.addSubview(warn)
 
-        let cancel = NSButton(title: "Vazgeç", target: self, action: #selector(close))
+        let cancel = NSButton(title: T("Vazgeç", "Cancel"), target: self, action: #selector(close))
         cancel.bezelStyle = .rounded
         cancel.keyEquivalent = "\u{1b}"
         cancel.frame = NSRect(x: W - L - 220, y: 24, width: 104, height: 32)
@@ -1278,22 +1300,22 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
             let times = Array(stride(from: startTime, through: endTime, by: interval))
             let head = times.prefix(3).map(SettingsWindow.clock).joined(separator: ", ")
             let tail = times.count > 3 ? " … \(SettingsWindow.clock(times.last!))" : ""
-            schedule.stringValue = "Uyarılar: \(head)\(tail)  (günde \(times.count) kez)"
+            schedule.stringValue = T("Uyarılar: \(head)\(tail)  (günde \(times.count) kez)", "Prompts: \(head)\(tail)  (\(times.count) a day)")
         } else {
             schedule.stringValue = ""
         }
         if endTime <= startTime {
-            msg = "Bitiş saati başlangıçtan sonra olmalı."
+            msg = T("Bitiş saati başlangıçtan sonra olmalı.", "End time must be after start time.")
         } else if interval < Settings.minInterval {
-            msg = "Aralık en az \(Settings.minInterval) dakika olmalı."
+            msg = T("Aralık en az \(Settings.minInterval) dakika olmalı.", "Interval must be at least \(Settings.minInterval) minutes.")
         } else if duration >= interval {
-            msg = "Spor süresi aralıktan kısa olmalı."
+            msg = T("Spor süresi aralıktan kısa olmalı.", "Session length must be shorter than the interval.")
         }
         warn.stringValue = msg
         saveBtn.isEnabled = msg.isEmpty
     }
 
-    @objc func volumeChanged() { volumeLabel.stringValue = "%\(volume.integerValue)" }
+    @objc func volumeChanged() { volumeLabel.stringValue = EN ? "\(volume.integerValue)%" : "%\(volume.integerValue)" }
 
     @objc func openMusic() {
         // Hazır parçaların durduğu klasör; buraya eklenenler de çalar ve güncellemede silinmez
@@ -1313,6 +1335,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         s.sleepNotices = sleepBox.state == .on
         s.moves = movesBox.state == .on
         s.skipIfAway = awayBox.state == .on
+        s.language = ["auto", "tr", "en"][max(0, lang.indexOfSelectedItem)]
         s.volume = volume.integerValue
         do {
             try s.save()
@@ -1320,7 +1343,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
             print("ayarlar kaydedildi: aralık \(s.intervalMin) dk, süre \(s.sessionMin) dk, müzik \(s.music ? "açık" : "kapalı")")
             close()
         } catch {
-            warn.stringValue = "Kaydedilemedi: \(error.localizedDescription)"
+            warn.stringValue = T("Kaydedilemedi: ", "Could not save: ") + error.localizedDescription
         }
     }
 
@@ -1379,7 +1402,7 @@ final class ReportWindow: NSObject, NSWindowDelegate {
         let W: CGFloat = 600, H: CGFloat = 420, L: CGFloat = 32
         win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: W, height: H),
                        styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        win.title = "Spor Vakti · Haftalık rapor"
+        win.title = T("Spor Vakti · Haftalık rapor", "Spor Vakti · Weekly report")
         win.appearance = NSAppearance(named: .darkAqua)
         win.backgroundColor = C_BG1
         win.isReleasedWhenClosed = false
@@ -1389,7 +1412,7 @@ final class ReportWindow: NSObject, NSWindowDelegate {
         let all = journal.all()
         let cal = Calendar.current
         let dayName = DateFormatter()
-        dayName.locale = Locale(identifier: "tr_TR")
+        dayName.locale = Locale(identifier: EN ? "en_US" : "tr_TR")
         dayName.dateFormat = "EEE"
         var days: [BarChart.Day] = []
         var total = DayStats([])
@@ -1399,7 +1422,7 @@ final class ReportWindow: NSObject, NSWindowDelegate {
             let st = DayStats(all.filter { $0.day == key })
             total.sessions += st.sessions; total.sportMin += st.sportMin
             total.passes += st.passes; total.missedMin += st.missedMin
-            days.append(.init(label: back == 0 ? "Bugün" : dayName.string(from: date),
+            days.append(.init(label: back == 0 ? T("Bugün", "Today") : dayName.string(from: date),
                               sport: st.sportMin, missed: st.missedMin, isToday: back == 0))
         }
 
@@ -1408,15 +1431,15 @@ final class ReportWindow: NSObject, NSWindowDelegate {
             l.font = .systemFont(ofSize: size, weight: w); l.textColor = c; l.frame = f
             v.addSubview(l)
         }
-        t("Son 7 gün", 24, .bold, C_WHITE, NSRect(x: L, y: H - 62, width: 300, height: 32))
+        t(T("Son 7 gün", "Last 7 days"), 24, .bold, C_WHITE, NSRect(x: L, y: H - 62, width: 300, height: 32))
         let streak = journal.streak()
-        t(streak > 0 ? "\(streak) gündür her gün spor yapıyorsun." : "Bugün bir seansla yeni bir seri başlat.",
+        t(streak > 0 ? T("\(streak) gündür her gün spor yapıyorsun.", "You've exercised every day for \(streak) days.") : T("Bugün bir seansla yeni bir seri başlat.", "Start a new streak with a session today."),
           13, .medium, streak > 0 ? C_ACCENT : C_MUTED, NSRect(x: L, y: H - 88, width: W - 2 * L, height: 18))
 
         // Toplamlar
         let cols: [(String, String, NSColor)] = [
-            ("\(total.sessions)", "seans", C_WHITE), ("\(total.sportMin) dk", "spor", C_ACCENT),
-            ("\(total.passes)", "pas", C_WARN), ("\(total.missedMin) dk", "kaçırılan", C_WARN)]
+            ("\(total.sessions)", T("seans", "sessions"), C_WHITE), ("\(total.sportMin) \(T("dk", "min"))", T("spor", "exercise"), C_ACCENT),
+            ("\(total.passes)", T("pas", "skipped"), C_WARN), ("\(total.missedMin) \(T("dk", "min"))", T("kaçırılan", "missed"), C_WARN)]
         let cw = (W - 2 * L) / CGFloat(cols.count)
         for (i, c) in cols.enumerated() {
             t(c.0, 22, .bold, c.2, NSRect(x: L + cw * CGFloat(i), y: H - 136, width: cw, height: 28))
@@ -1430,9 +1453,9 @@ final class ReportWindow: NSObject, NSWindowDelegate {
             let m = NSMutableAttributedString()
             let f = NSFont.systemFont(ofSize: 11)
             m.append(NSAttributedString(string: "■ ", attributes: [.foregroundColor: C_ACCENT, .font: f]))
-            m.append(NSAttributedString(string: "spor dakikası     ", attributes: [.foregroundColor: C_MUTED, .font: f]))
+            m.append(NSAttributedString(string: T("spor dakikası     ", "exercise minutes     "), attributes: [.foregroundColor: C_MUTED, .font: f]))
             m.append(NSAttributedString(string: "■ ", attributes: [.foregroundColor: C_WARN, .font: f]))
-            m.append(NSAttributedString(string: "kaçırılan dakika", attributes: [.foregroundColor: C_MUTED, .font: f]))
+            m.append(NSAttributedString(string: T("kaçırılan dakika", "missed minutes"), attributes: [.foregroundColor: C_MUTED, .font: f]))
             return m
         }())
         legend.frame = NSRect(x: L, y: 18, width: W - 2 * L, height: 16)
@@ -1493,32 +1516,32 @@ final class MenuBar: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         let p = pauseState()
         if p.paused {
-            add(menu, p.until.map { "Duraklatıldı · \(MenuBar.hm.string(from: $0))'e kadar" } ?? "Duraklatıldı")
+            add(menu, p.until.map { T("Duraklatıldı · \(MenuBar.hm.string(from: $0))'e kadar", "Paused until \(MenuBar.hm.string(from: $0))") } ?? T("Duraklatıldı", "Paused"))
         } else {
             let next = nextPrompt()
             let mins = Int(ceil(next.timeIntervalSinceNow / 60))
             let when = Calendar.current.isDateInToday(next)
-                ? (mins <= 0 ? "şimdi" : mins < 60 ? "\(mins) dk sonra" : "\(mins / 60) sa \(mins % 60) dk sonra")
-                : "yarın"
-            add(menu, "Sonraki spor: \(MenuBar.hm.string(from: next)) · \(when)")
+                ? (mins <= 0 ? T("şimdi", "now") : mins < 60 ? T("\(mins) dk sonra", "in \(mins) min") : T("\(mins / 60) sa \(mins % 60) dk sonra", "in \(mins / 60) h \(mins % 60) min"))
+                : T("yarın", "tomorrow")
+            add(menu, T("Sonraki spor: ", "Next workout: ") + "\(MenuBar.hm.string(from: next)) · \(when)")
         }
         let t = DayStats(journal.today())
-        add(menu, "Bugün: \(t.sessions) seans · \(t.sportMin) dk spor · \(t.passes) pas")
+        add(menu, T("Bugün: \(t.sessions) seans · \(t.sportMin) dk spor · \(t.passes) pas", "Today: \(t.sessions) sessions · \(t.sportMin) min exercise · \(t.passes) skipped"))
         let streak = journal.streak()
-        if streak >= 1 { add(menu, "Seri: \(streak) gündür her gün spor") }
+        if streak >= 1 { add(menu, T("Seri: \(streak) gündür her gün spor", "Streak: \(streak) days in a row")) }
         menu.addItem(.separator())
-        add(menu, "Şimdi spor yap", #selector(startNow))
+        add(menu, T("Şimdi spor yap", "Work out now"), #selector(startNow))
         if p.paused {
-            add(menu, "Devam et", #selector(doResume))
+            add(menu, T("Devam et", "Resume"), #selector(doResume))
         } else {
-            add(menu, "1 saat duraklat", #selector(pauseHour))
-            add(menu, "Bugünlük duraklat", #selector(pauseToday))
+            add(menu, T("1 saat duraklat", "Pause for 1 hour"), #selector(pauseHour))
+            add(menu, T("Bugünlük duraklat", "Pause for today"), #selector(pauseToday))
         }
         menu.addItem(.separator())
-        add(menu, "Ayarlar…", #selector(openSettings))
-        add(menu, "Haftalık rapor…", #selector(openReport))
+        add(menu, T("Ayarlar…", "Settings…"), #selector(openSettings))
+        add(menu, T("Haftalık rapor…", "Weekly report…"), #selector(openReport))
         menu.addItem(.separator())
-        add(menu, "Menü çubuğundan kaldır", #selector(quitMenu))
+        add(menu, T("Menü çubuğundan kaldır", "Remove from menu bar"), #selector(quitMenu))
     }
 
     /// Spor/uyku ekranı şu an açık mı (bu menü ve ayar pencereleri hariç)
