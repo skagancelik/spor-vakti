@@ -49,6 +49,8 @@ struct Settings {
     var volume = 80
     /// Seans sırasında dakikada bir değişen hareket önerileri
     var moves = true
+    /// Son aralıkta 5 dk'dan uzun masadan uzaktaysan uyarı gelmez (zaten kalktın)
+    var skipIfAway = true
 
     static let url = DATA_DIR.appendingPathComponent("ayarlar")
     static let minInterval = 15
@@ -68,6 +70,7 @@ struct Settings {
             case "uyku_uyarisi": s.sleepNotices = kv[1] != "0"
             case "ses":          if let v = Int(kv[1]) { s.volume = min(100, max(10, v)) }
             case "hareket":      s.moves = kv[1] != "0"
+            case "kalkinca_atla": s.skipIfAway = kv[1] != "0"
             default: break
             }
         }
@@ -77,7 +80,7 @@ struct Settings {
     func save() throws {
         let text = "aralik_dk=\(intervalMin)\nsure_dk=\(sessionMin)\nmuzik=\(music ? 1 : 0)\n"
             + "baslangic_dk=\(startMin)\nbitis_dk=\(endMin)\nuyku_uyarisi=\(sleepNotices ? 1 : 0)\n"
-            + "ses=\(volume)\nhareket=\(moves ? 1 : 0)\n"
+            + "ses=\(volume)\nhareket=\(moves ? 1 : 0)\nkalkinca_atla=\(skipIfAway ? 1 : 0)\n"
         try text.write(to: Settings.url, atomically: true, encoding: .utf8)
     }
 }
@@ -1017,6 +1020,11 @@ final class Controller {
         timer?.invalidate()
         music.stop()
         expand()
+        // run.sh: seans sırasındaki hareketsizlik "masadan kalktın" sayılmasın
+        if !isTrial {
+            try? "\(Int(Date().timeIntervalSince1970))\n".write(to: DATA_DIR.appendingPathComponent("son_seans"),
+                                                               atomically: true, encoding: .utf8)
+        }
         let elapsed = Date().timeIntervalSince(start)
         let doneMin = early ? min(SESSION_MIN, Int(elapsed / 60)) : SESSION_MIN
 
@@ -1110,6 +1118,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     let schedule = NSTextField(labelWithString: "")
     let sleepBox = NSButton(checkboxWithTitle: "Uyku uyarıları", target: nil, action: nil)
     let movesBox = NSButton(checkboxWithTitle: "Hareket önerileri göster", target: nil, action: nil)
+    let awayBox = NSButton(checkboxWithTitle: "Masadan zaten kalktıysan uyarma", target: nil, action: nil)
     let volume = NSSlider(value: 80, minValue: 10, maxValue: 100, target: nil, action: nil)
     let volumeLabel = NSTextField(labelWithString: "")
     let dur = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -1127,7 +1136,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 
     func show() {
-        let W: CGFloat = 520, H: CGFloat = 640, L: CGFloat = 32, X: CGFloat = 190
+        let W: CGFloat = 520, H: CGFloat = 716, L: CGFloat = 32, X: CGFloat = 190
         win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: W, height: H),
                        styleMask: [.titled, .closable], backing: .buffered, defer: false)
         win.title = "Spor Vakti · Ayarlar"
@@ -1194,8 +1203,16 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         v.addSubview(text("Spor sırasında dakikada bir yeni hareket önerisi.", 12, .regular,
                           C_MUTED, NSRect(x: L + 20, y: H - 396, width: W - 2 * L - 20, height: 18)))
 
+        // Masadan kalktıysan
+        awayBox.frame = NSRect(x: L - 2, y: H - 448, width: 360, height: 22)
+        awayBox.font = .systemFont(ofSize: 14, weight: .semibold)
+        awayBox.state = settings.skipIfAway ? .on : .off
+        v.addSubview(awayBox)
+        v.addSubview(text("Son aralıkta 5 dakikadan uzun bilgisayardan uzaktaysan o uyarı gelmez.", 12, .regular,
+                          C_MUTED, NSRect(x: L + 20, y: H - 472, width: W - 2 * L - 20, height: 18)))
+
         // Müzik
-        musicBox.frame = NSRect(x: L - 2, y: H - 448, width: 300, height: 22)
+        musicBox.frame = NSRect(x: L - 2, y: H - 524, width: 300, height: 22)
         musicBox.font = .systemFont(ofSize: 14, weight: .semibold)
         musicBox.state = settings.music ? .on : .off
         v.addSubview(musicBox)
@@ -1204,20 +1221,20 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
                                       : "Henüz parça yok. Klasöre mp3 ekle."
         musicInfo.font = .systemFont(ofSize: 12)
         musicInfo.textColor = C_MUTED
-        musicInfo.frame = NSRect(x: L + 20, y: H - 472, width: W - 2 * L - 20, height: 18)
+        musicInfo.frame = NSRect(x: L + 20, y: H - 548, width: W - 2 * L - 20, height: 18)
         v.addSubview(musicInfo)
         let open = NSButton(title: "Müzik klasörünü aç", target: self, action: #selector(openMusic))
         open.bezelStyle = .rounded
-        open.frame = NSRect(x: L + 14, y: H - 548, width: 180, height: 30)
+        open.frame = NSRect(x: L + 14, y: H - 624, width: 180, height: 30)
         v.addSubview(open)
-        v.addSubview(text("Ses", 13, .medium, C_WHITE, NSRect(x: L + 20, y: H - 506, width: 40, height: 18)))
-        volume.frame = NSRect(x: L + 60, y: H - 510, width: 240, height: 24)
+        v.addSubview(text("Ses", 13, .medium, C_WHITE, NSRect(x: L + 20, y: H - 582, width: 40, height: 18)))
+        volume.frame = NSRect(x: L + 60, y: H - 586, width: 240, height: 24)
         volume.integerValue = settings.volume
         volume.target = self; volume.action = #selector(volumeChanged)
         v.addSubview(volume)
         volumeLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
         volumeLabel.textColor = C_MUTED
-        volumeLabel.frame = NSRect(x: L + 308, y: H - 506, width: 50, height: 18)
+        volumeLabel.frame = NSRect(x: L + 308, y: H - 582, width: 50, height: 18)
         v.addSubview(volumeLabel)
         volumeChanged()
 
@@ -1295,6 +1312,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         s.endMin = endTime
         s.sleepNotices = sleepBox.state == .on
         s.moves = movesBox.state == .on
+        s.skipIfAway = awayBox.state == .on
         s.volume = volume.integerValue
         do {
             try s.save()

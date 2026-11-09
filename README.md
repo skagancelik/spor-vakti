@@ -18,7 +18,7 @@ Sana ne yapacağını söylemez. Ama sana sorar: **gerçekten yapıyor musun, yo
 - **Ne yapacağını bilirsin.** Seans sırasında dakikada bir yeni, ekipmansız hareket önerisi: sandalyeden kalk-otur, masaya dayanarak şınav, duvarda oturma… İstersen ayarlardan kapatırsın.
 - **Kendi ritmin.** Kaç saat kaç dakikada bir spor yapacağını ve her seansın kaç dakika süreceğini ayar ekranından seçersin.
 - **Dürüst bir hesap.** Her seans, her pas, kaçırılan her dakika kayda geçer; `rapor.command` son 7 günü gösterir.
-- **Doğru anda susar.** Görüşmedeyken, ekran paylaşırken ya da bilgisayar başında değilken araya girmez.
+- **Doğru anda susar.** Görüşmedeyken, ekran paylaşırken ya da bilgisayar başında değilken araya girmez. Son aralıkta zaten masadan kalktıysan o uyarıyı atlar.
 - **Menü çubuğunda.** Sonraki sporun saati hep gözünün önünde; tek tıkla duraklat, ayarla ya da haftalık raporuna bak.
 
 ### Nasıl çalışır
@@ -50,6 +50,7 @@ Simge her girişte kendiliğinden açılır. "Menü çubuğundan kaldır" dersen
 - **Görüşmedeyken:** Bir uygulama mikrofonu kullanıyorsa (Zoom, Google Meet, Teams…) uyarı açılmaz.
 - **Ekran paylaşırken:** Zoom paylaşımı ya da Chrome'un paylaşım çubuğu varsa uyarı açılmaz. Pencereler ayrıca ekran yakalamadan hariç tutulacak şekilde işaretlenir. Karşı taraf görmez.
 - Ekran kilitliyken, ekran koruyucu açıkken, 10 dakikadan uzun süredir klavye ya da fare kullanılmıyorsa.
+- **Zaten kalktıysan:** son aralıkta (ör. son 30 dk) 5 dakikadan uzun bilgisayardan uzak kaldıysan o uyarı gelmez; spor seansının kendisi bu sayıma girmez. Ayarlardan kapatılabilir.
 - Bilgisayar uykudan geç uyandıysa (uyarı dakikasının üzerinden 5 dakika geçtiyse).
 - Spor saatlerinin dışında (varsayılan 07:00–23:00; ayarlardan değişir).
 - Duraklatılmışken.
@@ -90,6 +91,7 @@ Spor ekranında sağ üstteki **Ayarlar** düğmesine bas (ya da `A`), veya iste
 | **Spor süresi** | 1–60 dakika | 10 dk |
 | **Uyku uyarıları** | 23:30 "Uyku hazırlığı" ve 23:59 "Uyku vakti" ekranları: açık / kapalı | Açık |
 | **Hareket önerileri** | Spor sırasında dakikada bir değişen hareket: açık / kapalı | Açık |
+| **Masadan zaten kalktıysan uyarma** | Son aralıkta 5 dakikadan uzun bilgisayardan uzaktaysan o uyarıyı atla | Açık |
 | **Müzik** | Spor boyunca müzik çal: açık / kapalı, ses seviyesi (%10–100) | Açık, %80 |
 
 Kaydettiğin an geçerli olur; yeniden kurman gerekmez.
@@ -128,7 +130,7 @@ It doesn't tell you what to do. It asks: **are you actually doing it, or skippin
 - **You know what to do.** During the session a new no-equipment move appears every minute: chair squats, desk push-ups, wall sits… Turn it off in settings if you prefer.
 - **Your own rhythm.** Pick how often to move (hours + minutes) and how long each session lasts in the settings window.
 - **An honest tally.** Every session, skip and missed minute is logged; `rapor.command` shows the last 7 days.
-- **Quiet at the right time.** Stays out of the way during calls, screen sharing, or when you're away from the desk.
+- **Quiet at the right time.** Stays out of the way during calls, screen sharing, or when you're away from the desk. If you already got up during the last interval, it skips that prompt.
 - **In your menu bar.** The next workout time is always visible; pause, change settings, or open your weekly report in one click.
 
 ### How it works
@@ -157,6 +159,7 @@ The icon starts at every login. "Menü çubuğundan kaldır" hides it until the 
 - **On a call:** if any app is capturing the microphone (Zoom, Google Meet, Teams…).
 - **While screen sharing:** Zoom sharing or Chrome's sharing bar detected. The windows are also excluded from screen capture where supported, so the people you share with don't see the reminder.
 - Screen locked, screensaver running, or no keyboard or mouse activity for 10+ minutes.
+- **Already up:** if you were away from the computer for more than 5 minutes during the last interval (e.g. the last 30 minutes), that prompt is skipped; the workout session itself doesn't count. Can be turned off in settings.
 - Late wake from sleep, outside your workout hours (default 07:00–23:00, set in settings), or paused.
 
 No answer within 5 minutes counts as a skip.
@@ -186,6 +189,7 @@ Press **Ayarlar** (or `A`) on the workout prompt, or double-click `ayarlar.comma
 | **Session length** (Spor süresi) | 1–60 minutes | 10 min |
 | **Sleep notices** (Uyku uyarıları) | The 23:30 "Get ready for bed" and 23:59 "Bedtime" screens: on / off | On |
 | **Move suggestions** (Hareket önerileri) | A new move every minute during the session: on / off | On |
+| **Skip if already up** (Masadan zaten kalktıysan uyarma) | Skip the prompt if you were away for 5+ minutes during the last interval | On |
 | **Music** (Müzik) | Play music during the session: on / off, volume (10–100%) | On, 80% |
 
 Changes apply as soon as you save; no reinstall needed.
