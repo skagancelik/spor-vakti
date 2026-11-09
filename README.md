@@ -1,3 +1,5 @@
+<img src="assets/SporVakti.png" width="96" align="right" alt="Spor Vakti ikonu">
+
 # Spor Vakti
 
 **[Türkçe](#türkçe) · [English](#english)**
@@ -84,7 +86,7 @@ Ya da Finder'da dosyalara çift tıkla:
 
 | Dosya | Ne yapar |
 |---|---|
-| `kur.command` | Derler, kurar, zamanlayıcıyı başlatır. Güncelleme için de tekrar çalıştır. |
+| `kur.command` | Kurar, zamanlayıcıyı başlatır, Uygulamalar listesine **Spor Vakti** ikonunu ekler. Güncelleme için de tekrar çalıştır. |
 | `deneme.command` | Ekranları dener (20 sn'lik spor + iki gece uyarısı). İstatistiğe yazılmaz. |
 | `rapor.command` | Son 7 günün tablosu, terminalde (grafikli hali menü çubuğunda). |
 | `ayarlar.command` | Ayar ekranı: spor aralığı, spor süresi, müzik. |
@@ -95,7 +97,7 @@ Ya da Finder'da dosyalara çift tıkla:
 
 ![Ayarlar](docs/7-ayarlar.png)
 
-Spor ekranında sağ üstteki **Ayarlar** düğmesine bas (ya da `A`), veya istediğin zaman `ayarlar.command` dosyasına çift tıkla:
+İstediğin zaman **Uygulamalar** listesinden ya da Spotlight'tan (⌘ Boşluk → "Spor Vakti") **Spor Vakti** ikonuna tıkla. Ya da menü çubuğundaki koşan adam → **Ayarlar…**, spor ekranında sağ üstteki **Ayarlar** (ya da `A`), veya `ayarlar.command`:
 
 | Ayar | Seçenekler | Varsayılan |
 |---|---|---|
@@ -203,13 +205,13 @@ cd spor-vakti
 ./kur.command
 ```
 
-The `.command` scripts can also be double-clicked in Finder: `kur` (install/update), `deneme` (try the screens, nothing is recorded), `rapor` (7-day report), `ayarlar` (settings), `duraklat` (pause/resume), `kaldir` (uninstall; history is kept).
+The `.command` scripts can also be double-clicked in Finder: `kur` (install/update; also adds the **Spor Vakti** icon to your Applications list), `deneme` (try the screens, nothing is recorded), `rapor` (7-day report), `ayarlar` (settings), `duraklat` (pause/resume), `kaldir` (uninstall; history is kept).
 
 ### Settings
 
 ![Settings](docs/7-ayarlar.png)
 
-Press **Ayarlar** (or `A`) on the workout prompt, or double-click `ayarlar.command` anytime:
+Anytime: click the **Spor Vakti** icon in your Applications list or Spotlight (⌘ Space → "Spor Vakti"). Or use the menu bar runner → **Ayarlar…**, the **Ayarlar** button (or `A`) on the workout prompt, or `ayarlar.command`:
 
 | Setting | Options | Default |
 |---|---|---|

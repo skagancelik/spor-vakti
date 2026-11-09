@@ -9,7 +9,10 @@ import Foundation
 // MARK: - Ayarlar
 
 let env = ProcessInfo.processInfo.environment
-let args = Array(CommandLine.arguments.dropFirst())
+/// "Spor Vakti.app" içinden açıldıysa (Uygulamalar listesi, Spotlight, Finder) ayar ekranı açılır.
+/// Asıl kurulum klasörü (zamanlayıcı, müzik) her durumda ~/Applications/SporVakti'dir.
+let inAppBundle = Bundle.main.bundleURL.pathExtension == "app"
+let args = Array(CommandLine.arguments.dropFirst()).filter { !$0.hasPrefix("-psn_") }
 let isTrial = args.contains("--deneme")
 
 /// Gece uyarıları: "uyku-hazirlik" (23:30) ve "uyku" (23:59). Yoksa spor akışı.
@@ -17,7 +20,7 @@ enum Notice: String { case prepare = "uyku-hazirlik", sleep = "uyku" }
 let notice = args.compactMap(Notice.init(rawValue:)).first
 
 /// Ayar ekranı:  spor-vakti ayarlar
-let isSettings = args.first == "ayarlar"
+let isSettings = args.first == "ayarlar" || (inAppBundle && args.isEmpty)
 /// Menü çubuğu simgesi:  spor-vakti menu  (girişte LaunchAgent başlatır)
 let isMenu = args.first == "menu"
 /// Menüden "Şimdi spor yap": saat beklemeden spor ekranı (kayıt tutulur)
@@ -352,8 +355,10 @@ if !isTrial && !isSettings && !isMenu && !isNow {
 // 2) DATA_DIR/muzik: eski sürümlerden kalan kişisel klasör (hâlâ taranır)
 
 let MUSIC_EXT: Set<String> = ["mp3", "m4a", "aac", "wav", "aiff", "aif"]
-let APP_MUSIC_DIR: URL = (Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0]))
-    .resolvingSymlinksInPath().deletingLastPathComponent().appendingPathComponent("muzik")
+let INSTALL_DIR: URL = inAppBundle
+    ? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/SporVakti")
+    : (Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0])).resolvingSymlinksInPath().deletingLastPathComponent()
+let APP_MUSIC_DIR: URL = INSTALL_DIR.appendingPathComponent("muzik")
 let USER_MUSIC_DIR: URL = DATA_DIR.appendingPathComponent("muzik")
 
 func musicFiles() -> [URL] {
