@@ -20,6 +20,8 @@ codesign --force --sign - "$PKG/bin/spor-vakti"   # ad-hoc imza (Apple Silicon'd
 echo "-- dosyalar kopyalanıyor"
 cp "$ROOT/scripts/run.sh" "$PKG/scripts/"
 cp -R "$ROOT/muzik" "$PKG/muzik"
+cp -R "$ROOT/assets" "$PKG/assets"
+echo "$VER" > "$PKG/VERSION"
 cp "$ROOT"/*.command "$ROOT/README.md" "$ROOT/LICENSE" "$PKG/"
 chmod +x "$PKG"/*.command "$PKG/scripts/run.sh" "$PKG/bin/spor-vakti"
 

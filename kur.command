@@ -29,8 +29,39 @@ cp "$SRC/scripts/run.sh" "$APP_DIR/run.sh"
 mkdir -p "$APP_DIR/muzik"
 cp "$SRC"/muzik/* "$APP_DIR/muzik/" 2>/dev/null || true
 chmod +x "$APP_DIR/spor-vakti" "$APP_DIR/run.sh"
+# Uygulamalar listesinde / Spotlight'ta görünen "Spor Vakti.app": açınca ayar ekranı gelir.
+echo "-- Spor Vakti.app (Uygulamalar listesi)"
+BUNDLE="$HOME/Applications/Spor Vakti.app"
+VER="$(cat "$SRC/VERSION" 2>/dev/null || echo 1.0)"
+rm -rf "$BUNDLE"
+mkdir -p "$BUNDLE/Contents/MacOS" "$BUNDLE/Contents/Resources"
+cp "$APP_DIR/spor-vakti" "$BUNDLE/Contents/MacOS/spor-vakti"
+cp "$SRC/assets/SporVakti.icns" "$BUNDLE/Contents/Resources/SporVakti.icns" 2>/dev/null || true
+cat > "$BUNDLE/Contents/Info.plist" <<PL
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>Spor Vakti</string>
+  <key>CFBundleDisplayName</key><string>Spor Vakti</string>
+  <key>CFBundleIdentifier</key><string>com.sporvakti.app</string>
+  <key>CFBundleExecutable</key><string>spor-vakti</string>
+  <key>CFBundleIconFile</key><string>SporVakti</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>$VER</string>
+  <key>CFBundleVersion</key><string>$VER</string>
+  <key>LSApplicationCategoryType</key><string>public.app-category.healthcare-fitness</string>
+  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>NSHighResolutionCapable</key><true/>
+</dict>
+</plist>
+PL
+codesign --force --sign - "$BUNDLE" 2>/dev/null || true
+touch "$BUNDLE"
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$BUNDLE" 2>/dev/null || true
+
 # İnternetten indirilen dosyalardaki karantina işaretini kaldır (launchd'nin çalıştırabilmesi için)
-xattr -dr com.apple.quarantine "$APP_DIR" 2>/dev/null || true
+xattr -dr com.apple.quarantine "$APP_DIR" "$BUNDLE" 2>/dev/null || true
 
 echo "-- LaunchAgent yazılıyor"
 cat > "$PLIST" <<PL
@@ -95,4 +126,5 @@ PL
 yukle "$MLABEL" "$MPLIST"
 echo "✅ Kuruldu. Spor uyarıları ayarladığın saatlerde gelir (varsayılan 07:00–23:00, saat başı), uyku uyarıları 23:30 ve 23:59'da."
 echo "   Menü çubuğundaki koşan adam simgesi: sonraki spor, duraklat, ayarlar, rapor."
+echo "   Ayarlar: Uygulamalar listesinde ya da Spotlight'ta \"Spor Vakti\"."
 echo "   Denemek için: deneme.command"
