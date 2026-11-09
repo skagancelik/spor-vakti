@@ -30,8 +30,13 @@ let DATA_DIR: URL = {
 
 /// Kullanıcı ayarları: DATA_DIR/ayarlar (anahtar=değer satırları; run.sh de okur)
 struct Settings {
-    /// İki spor uyarısı arası (dakika, 5'in katı). 07:00'den başlayarak sayılır.
+    /// İki spor uyarısı arası (dakika, 5'in katı). Başlangıç saatinden itibaren sayılır.
     var intervalMin = 60
+    /// Spor uyarılarının geldiği saatler (gece yarısından beri dakika, 5'in katı). Bitiş dahil.
+    var startMin = 7 * 60
+    var endMin = 23 * 60
+    /// 23:30 "uyku hazırlığı" ve 23:59 "uyku vakti" uyarıları
+    var sleepNotices = true
     /// Bir seansın süresi (dakika)
     var sessionMin = 10
     /// Seans boyunca muzik klasöründeki parçaları çal
@@ -50,6 +55,9 @@ struct Settings {
             case "aralik_dk": if let v = Int(kv[1]), v >= minInterval { s.intervalMin = v }
             case "sure_dk":   if let v = Int(kv[1]), v >= 1 { s.sessionMin = v }
             case "muzik":     s.music = kv[1] != "0"
+            case "baslangic_dk": if let v = Int(kv[1]), (0..<1440).contains(v) { s.startMin = v }
+            case "bitis_dk":     if let v = Int(kv[1]), (0..<1440).contains(v) { s.endMin = v }
+            case "uyku_uyarisi": s.sleepNotices = kv[1] != "0"
             default: break
             }
         }
@@ -58,6 +66,7 @@ struct Settings {
 
     func save() throws {
         let text = "aralik_dk=\(intervalMin)\nsure_dk=\(sessionMin)\nmuzik=\(music ? 1 : 0)\n"
+            + "baslangic_dk=\(startMin)\nbitis_dk=\(endMin)\nuyku_uyarisi=\(sleepNotices ? 1 : 0)\n"
         try text.write(to: Settings.url, atomically: true, encoding: .utf8)
     }
 }
@@ -947,6 +956,12 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     init(onClose: @escaping () -> Void) { self.onClose = onClose }
     let hours = NSPopUpButton(frame: .zero, pullsDown: false)
     let mins = NSPopUpButton(frame: .zero, pullsDown: false)
+    let startH = NSPopUpButton(frame: .zero, pullsDown: false)
+    let startM = NSPopUpButton(frame: .zero, pullsDown: false)
+    let endH = NSPopUpButton(frame: .zero, pullsDown: false)
+    let endM = NSPopUpButton(frame: .zero, pullsDown: false)
+    let schedule = NSTextField(labelWithString: "")
+    let sleepBox = NSButton(checkboxWithTitle: "Uyku uyarıları", target: nil, action: nil)
     let dur = NSPopUpButton(frame: .zero, pullsDown: false)
     let musicBox = NSButton(checkboxWithTitle: "Spor boyunca müzik çal", target: nil, action: nil)
     let musicInfo = NSTextField(labelWithString: "")
@@ -962,7 +977,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 
     func show() {
-        let W: CGFloat = 480, H: CGFloat = 430, L: CGFloat = 32
+        let W: CGFloat = 520, H: CGFloat = 530, L: CGFloat = 32, X: CGFloat = 190
         win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: W, height: H),
                        styleMask: [.titled, .closable], backing: .buffered, defer: false)
         win.title = "Spor Vakti · Ayarlar"
@@ -974,28 +989,55 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
 
         v.addSubview(text("Ayarlar", 24, .bold, C_WHITE, NSRect(x: L, y: H - 62, width: 300, height: 32)))
 
+        // Saatler: başlangıç – bitiş
+        v.addSubview(text("Spor saatleri", 14, .semibold, C_WHITE, NSRect(x: L, y: H - 112, width: 150, height: 20)))
+        let hh = (0...23).map { String(format: "%02d", $0) }
+        let mm = stride(from: 0, through: 55, by: 5).map { String(format: "%02d", $0) }
+        for (p, items) in [(startH, hh), (startM, mm), (endH, hh), (endM, mm)] { p.addItems(withTitles: items) }
+        startH.frame = NSRect(x: X, y: H - 116, width: 64, height: 26)
+        v.addSubview(text(":", 14, .semibold, C_MUTED, NSRect(x: X + 66, y: H - 112, width: 8, height: 20)))
+        startM.frame = NSRect(x: X + 74, y: H - 116, width: 64, height: 26)
+        v.addSubview(text("–", 14, .semibold, C_MUTED, NSRect(x: X + 146, y: H - 112, width: 14, height: 20)))
+        endH.frame = NSRect(x: X + 164, y: H - 116, width: 64, height: 26)
+        v.addSubview(text(":", 14, .semibold, C_MUTED, NSRect(x: X + 230, y: H - 112, width: 8, height: 20)))
+        endM.frame = NSRect(x: X + 238, y: H - 116, width: 64, height: 26)
+        startH.selectItem(at: settings.startMin / 60); startM.selectItem(at: (settings.startMin % 60) / 5)
+        endH.selectItem(at: settings.endMin / 60); endM.selectItem(at: (settings.endMin % 60) / 5)
+        for p in [startH, startM, endH, endM] { v.addSubview(p) }
+
         // Aralık: saat + dakika
-        v.addSubview(text("Spor aralığı", 14, .semibold, C_WHITE, NSRect(x: L, y: H - 112, width: 160, height: 20)))
+        v.addSubview(text("Spor aralığı", 14, .semibold, C_WHITE, NSRect(x: L, y: H - 162, width: 150, height: 20)))
         hours.addItems(withTitles: (0...6).map { "\($0) saat" })
         mins.addItems(withTitles: stride(from: 0, through: 55, by: 5).map { "\($0) dk" })
-        hours.frame = NSRect(x: 200, y: H - 116, width: 110, height: 26)
-        mins.frame = NSRect(x: 318, y: H - 116, width: 110, height: 26)
+        hours.frame = NSRect(x: X, y: H - 166, width: 110, height: 26)
+        mins.frame = NSRect(x: X + 118, y: H - 166, width: 110, height: 26)
         let iv = settings.intervalMin
         hours.selectItem(at: min(6, iv / 60))
         mins.selectItem(at: (iv % 60) / 5)
         v.addSubview(hours); v.addSubview(mins)
-        v.addSubview(text("Uyarılar 07:00'den başlar, bu aralıkla tekrar eder (23:30'a kadar).", 12, .regular, C_MUTED,
-                          NSRect(x: L, y: H - 144, width: W - 2 * L, height: 18)))
+        schedule.font = .systemFont(ofSize: 12)
+        schedule.textColor = C_MUTED
+        schedule.lineBreakMode = .byTruncatingTail
+        schedule.frame = NSRect(x: L, y: H - 194, width: W - 2 * L, height: 18)
+        v.addSubview(schedule)
 
         // Süre
-        v.addSubview(text("Spor süresi", 14, .semibold, C_WHITE, NSRect(x: L, y: H - 190, width: 160, height: 20)))
+        v.addSubview(text("Spor süresi", 14, .semibold, C_WHITE, NSRect(x: L, y: H - 240, width: 150, height: 20)))
         dur.addItems(withTitles: (1...60).map { "\($0) dk" })
-        dur.frame = NSRect(x: 200, y: H - 194, width: 110, height: 26)
+        dur.frame = NSRect(x: X, y: H - 244, width: 110, height: 26)
         dur.selectItem(at: min(60, settings.sessionMin) - 1)
         v.addSubview(dur)
 
+        // Uyku uyarıları
+        sleepBox.frame = NSRect(x: L - 2, y: H - 296, width: 300, height: 22)
+        sleepBox.font = .systemFont(ofSize: 14, weight: .semibold)
+        sleepBox.state = settings.sleepNotices ? .on : .off
+        v.addSubview(sleepBox)
+        v.addSubview(text("23:30'da \u{201C}Uyku hazırlığı\u{201D}, 23:59'da \u{201C}Uyku vakti\u{201D} ekranı.", 12, .regular,
+                          C_MUTED, NSRect(x: L + 20, y: H - 320, width: W - 2 * L - 20, height: 18)))
+
         // Müzik
-        musicBox.frame = NSRect(x: L - 2, y: H - 246, width: 300, height: 22)
+        musicBox.frame = NSRect(x: L - 2, y: H - 372, width: 300, height: 22)
         musicBox.font = .systemFont(ofSize: 14, weight: .semibold)
         musicBox.state = settings.music ? .on : .off
         v.addSubview(musicBox)
@@ -1004,11 +1046,11 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
                                       : "Henüz parça yok. Klasöre mp3 ekle."
         musicInfo.font = .systemFont(ofSize: 12)
         musicInfo.textColor = C_MUTED
-        musicInfo.frame = NSRect(x: L + 20, y: H - 270, width: W - 2 * L - 20, height: 18)
+        musicInfo.frame = NSRect(x: L + 20, y: H - 396, width: W - 2 * L - 20, height: 18)
         v.addSubview(musicInfo)
         let open = NSButton(title: "Müzik klasörünü aç", target: self, action: #selector(openMusic))
         open.bezelStyle = .rounded
-        open.frame = NSRect(x: L + 14, y: H - 306, width: 180, height: 30)
+        open.frame = NSRect(x: L + 14, y: H - 432, width: 180, height: 30)
         v.addSubview(open)
 
         warn.font = .systemFont(ofSize: 12, weight: .medium)
@@ -1027,7 +1069,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         saveBtn.frame = NSRect(x: W - L - 108, y: 24, width: 108, height: 32)
         v.addSubview(cancel); v.addSubview(saveBtn)
 
-        for p in [hours, mins, dur] { p.target = self; p.action = #selector(validate) }
+        for p in [hours, mins, dur, startH, startM, endH, endM] { p.target = self; p.action = #selector(validate) }
         validate()
 
         win.center()
@@ -1038,11 +1080,26 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 
     var interval: Int { hours.indexOfSelectedItem * 60 + mins.indexOfSelectedItem * 5 }
+    var startTime: Int { startH.indexOfSelectedItem * 60 + startM.indexOfSelectedItem * 5 }
+    var endTime: Int { endH.indexOfSelectedItem * 60 + endM.indexOfSelectedItem * 5 }
+
+    static func clock(_ m: Int) -> String { String(format: "%02d:%02d", m / 60, m % 60) }
     var duration: Int { dur.indexOfSelectedItem + 1 }
 
     @objc func validate() {
         var msg = ""
-        if interval < Settings.minInterval {
+        // Örnek düzen: ilk birkaç uyarı ve sonuncusu
+        if interval > 0 && endTime >= startTime {
+            let times = Array(stride(from: startTime, through: endTime, by: interval))
+            let head = times.prefix(3).map(SettingsWindow.clock).joined(separator: ", ")
+            let tail = times.count > 3 ? " … \(SettingsWindow.clock(times.last!))" : ""
+            schedule.stringValue = "Uyarılar: \(head)\(tail)  (günde \(times.count) kez)"
+        } else {
+            schedule.stringValue = ""
+        }
+        if endTime <= startTime {
+            msg = "Bitiş saati başlangıçtan sonra olmalı."
+        } else if interval < Settings.minInterval {
             msg = "Aralık en az \(Settings.minInterval) dakika olmalı."
         } else if duration >= interval {
             msg = "Spor süresi aralıktan kısa olmalı."
@@ -1064,6 +1121,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         s.intervalMin = interval
         s.sessionMin = duration
         s.music = musicBox.state == .on
+        s.startMin = startTime
+        s.endMin = endTime
+        s.sleepNotices = sleepBox.state == .on
         do {
             try s.save()
             applySettings(s)
