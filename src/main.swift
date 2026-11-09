@@ -53,6 +53,9 @@ struct Settings {
     var skipIfAway = true
     /// Arayüz dili: "auto" (sistem dili), "tr" ya da "en"
     var language = "auto"
+    /// Hareket önerileri için: nerede ("ofis" / "ev") ve amaç ("hareket": hareketsiz kalmamak / "spor")
+    var place = "ofis"
+    var goal = "spor"
 
     static let url = DATA_DIR.appendingPathComponent("ayarlar")
     static let minInterval = 15
@@ -74,6 +77,8 @@ struct Settings {
             case "hareket":      s.moves = kv[1] != "0"
             case "kalkinca_atla": s.skipIfAway = kv[1] != "0"
             case "dil":          if ["auto", "tr", "en"].contains(kv[1]) { s.language = kv[1] }
+            case "ortam":        if ["ofis", "ev"].contains(kv[1]) { s.place = kv[1] }
+            case "amac":         if ["hareket", "spor"].contains(kv[1]) { s.goal = kv[1] }
             default: break
             }
         }
@@ -84,7 +89,7 @@ struct Settings {
         let text = "aralik_dk=\(intervalMin)\nsure_dk=\(sessionMin)\nmuzik=\(music ? 1 : 0)\n"
             + "baslangic_dk=\(startMin)\nbitis_dk=\(endMin)\nuyku_uyarisi=\(sleepNotices ? 1 : 0)\n"
             + "ses=\(volume)\nhareket=\(moves ? 1 : 0)\nkalkinca_atla=\(skipIfAway ? 1 : 0)\n"
-            + "dil=\(language)\n"
+            + "dil=\(language)\nortam=\(place)\namac=\(goal)\n"
         try text.write(to: Settings.url, atomically: true, encoding: .utf8)
     }
 }
@@ -417,16 +422,52 @@ final class MusicPlayer: NSObject, AVAudioPlayerDelegate {
 // Ekipmansız, masa başında yapılabilen hareketler. Seans boyunca dakikada bir sıradakine geçilir.
 
 struct Move { let name: String; let how: String }
-let MOVES: [Move] = [
-    Move(name: T("Sandalyeden kalk, otur", "Chair squats"), how: T("Sandalyenin önünde dur; oturur gibi in, dokunmadan kalk. Sırtın dik.", "Stand in front of your chair; lower as if to sit, rise before touching it. Keep your back straight.")),
-    Move(name: T("Masaya dayanarak şınav", "Desk push-ups"), how: T("Ellerini masanın kenarına koy, gövdeni düz tutarak in ve it.", "Hands on the edge of the desk; keep your body straight, lower and push back up.")),
-    Move(name: T("Parmak ucunda yüksel", "Calf raises"), how: T("Topuklarını kaldır, bir saniye bekle, yavaşça indir.", "Rise onto your toes, hold for a second, lower slowly.")),
-    Move(name: T("Yerinde diz çek", "High knees"), how: T("Dizlerini sırayla bel hizasına kaldır; kollar da eşlik etsin.", "Bring your knees up to hip height in turn; swing your arms too.")),
-    Move(name: T("Duvarda otur", "Wall sit"), how: T("Sırtını duvara daya, dizlerin 90 derece olana kadar in, bekle.", "Back against the wall, slide down until your knees are at 90 degrees, hold.")),
-    Move(name: T("Omuz çevir", "Shoulder rolls"), how: T("Omuzlarını büyük daireler çizerek geriye, sonra öne çevir.", "Roll your shoulders in big circles backwards, then forwards.")),
-    Move(name: T("Göğsünü aç", "Chest opener"), how: T("Ellerini arkada birleştir, göğsünü öne it, derin nefes al.", "Clasp your hands behind you, push your chest forward, breathe deeply.")),
-    Move(name: T("Tempolu yürü", "Brisk walk"), how: T("Odada ya da koridorda hızlı adımlarla yürü.", "Walk briskly around the room or down the hall.")),
-]
+/// Nerede ve ne amaçla: dört ayrı hareket listesi
+func movesFor(place: String, goal: String) -> [Move] {
+    switch (place, goal) {
+    case ("ofis", "hareket"): return [
+        Move(name: T("Yerinde yürü", "Walk in place"), how: T("Masanın yanında ayakta, adımlarını yere hafifçe basarak yürü.", "Standing by your desk, march in place with light, quiet steps.")),
+        Move(name: T("Ağırlık aktar", "Shift your weight"), how: T("Ayakta dur, ağırlığını yavaşça bir bacaktan diğerine aktar.", "Stand and slowly shift your weight from one leg to the other.")),
+        Move(name: T("Omuz çevir", "Shoulder rolls"), how: T("Omuzlarını büyük daireler çizerek geriye, sonra öne çevir.", "Roll your shoulders in big circles backwards, then forwards.")),
+        Move(name: T("Kollarını aç", "Arm raises"), how: T("Kollarını yanlardan yavaşça yukarı kaldır, sonra indir.", "Raise your arms slowly out to the sides and overhead, then lower them.")),
+        Move(name: T("Boynunu esnet", "Neck stretch"), how: T("Başını yavaşça sağa, sonra sola eğ; zorlamadan bekle.", "Tilt your head gently to the right, then the left; hold without forcing.")),
+        Move(name: T("Belini çevir", "Waist twists"), how: T("Ellerin belinde, gövdeni yavaşça sağa ve sola çevir.", "Hands on your hips, slowly rotate your torso left and right.")),
+        Move(name: T("Bileklerini aç", "Wrist and finger stretch"), how: T("Bileklerini çevir, parmaklarını açıp kapa.", "Circle your wrists, then open and close your fingers.")),
+        Move(name: T("Parmak ucunda yüksel", "Calf raises"), how: T("Topuklarını kaldır, bir saniye bekle, yavaşça indir.", "Rise onto your toes, hold for a second, lower slowly.")),
+    ]
+    case ("ofis", "spor"): return [
+        Move(name: T("Sandalyeden kalk, otur", "Chair squats"), how: T("Sandalyenin önünde dur; oturur gibi in, dokunmadan kalk. Sırtın dik.", "Stand in front of your chair; lower as if to sit, rise before touching it. Keep your back straight.")),
+        Move(name: T("Masaya dayanarak şınav", "Desk push-ups"), how: T("Ellerini masanın kenarına koy, gövdeni düz tutarak in ve it.", "Hands on the edge of the desk; keep your body straight, lower and push back up.")),
+        Move(name: T("Duvarda otur", "Wall sit"), how: T("Sırtını duvara daya, dizlerin 90 derece olana kadar in, bekle.", "Back against the wall, slide down until your knees are at 90 degrees, hold.")),
+        Move(name: T("Geriye hamle", "Reverse lunges"), how: T("Bir adım geri at, arka dizini yere yaklaştır, dön; bacak değiştir.", "Step back, lower your back knee toward the floor, return; switch legs.")),
+        Move(name: T("Masada plank", "Desk plank"), how: T("Ön kolların masada, vücudun düz bir çizgi; karnını sık, bekle.", "Forearms on the desk, body in a straight line; brace your core and hold.")),
+        Move(name: T("Tempolu parmak ucu", "Fast calf raises"), how: T("Parmak ucunda hızlı ve kontrollü yüksel, in; tempo yüksek.", "Rise onto your toes and lower, fast but controlled.")),
+        Move(name: T("Yerinde diz çek", "High knees"), how: T("Dizlerini sırayla bel hizasına kaldır; kollar da eşlik etsin.", "Bring your knees up to hip height in turn; swing your arms too.")),
+        Move(name: T("Koridorda tempolu yürü", "Brisk hallway walk"), how: T("Koridorda ya da merdivende hızlı adımlarla yürü.", "Walk briskly down the hall or take the stairs.")),
+    ]
+    case ("ev", "hareket"): return [
+        Move(name: T("Yerinde yürü", "Walk in place"), how: T("Olduğun yerde dizlerini hafifçe kaldırarak yürü.", "Walk in place, lifting your knees a little.")),
+        Move(name: T("Gerin", "Big stretch"), how: T("Kollarını tavana uzat, parmak ucunda yüksel, derin nefes al.", "Reach for the ceiling, rise onto your toes, take a deep breath.")),
+        Move(name: T("Belini çevir", "Waist twists"), how: T("Ellerin belinde, gövdeni yavaşça sağa ve sola çevir.", "Hands on your hips, slowly rotate your torso left and right.")),
+        Move(name: T("Omuz çevir", "Shoulder rolls"), how: T("Omuzlarını büyük daireler çizerek geriye, sonra öne çevir.", "Roll your shoulders in big circles backwards, then forwards.")),
+        Move(name: T("Öne sarkıl", "Forward fold"), how: T("Dizler hafif bükük, öne eğil, kollar ve başın sarksın; yavaşça doğrul.", "Knees soft, fold forward and let your arms and head hang; roll up slowly.")),
+        Move(name: T("Ayak bileklerini çevir", "Ankle circles"), how: T("Bir ayağını kaldır, bileğini iki yöne çevir; ayak değiştir.", "Lift one foot and circle the ankle both ways; switch feet.")),
+        Move(name: T("Müzikle hareket et", "Move to the music"), how: T("Müziğin ritmine göre hafifçe dans et; keyfine bak.", "Dance lightly to the beat; just enjoy it.")),
+        Move(name: T("Göğsünü aç", "Chest opener"), how: T("Ellerini arkada birleştir, göğsünü öne it, derin nefes al.", "Clasp your hands behind you, push your chest forward, breathe deeply.")),
+    ]
+    default: return [
+        Move(name: T("Squat", "Squats"), how: T("Ayaklar omuz genişliğinde, kalçanı geriye it, in ve kalk.", "Feet shoulder-width apart, push your hips back, lower and stand up.")),
+        Move(name: T("Şınav", "Push-ups"), how: T("Yerde şınav; zor gelirse dizlerini yere koy.", "Push-ups on the floor; drop to your knees if needed.")),
+        Move(name: T("Jumping jack", "Jumping jacks"), how: T("Zıplayarak bacaklarını aç, kollarını başının üstünde birleştir.", "Jump your feet apart while bringing your arms overhead.")),
+        Move(name: T("Plank", "Plank"), how: T("Ön kollar ve ayak uçları yerde, vücut düz; karnını sık, bekle.", "Forearms and toes on the floor, body straight; brace and hold.")),
+        Move(name: T("Öne hamle", "Lunges"), how: T("Bir adım öne at, iki diz 90 derece, geri dön; bacak değiştir.", "Step forward, both knees at 90 degrees, return; switch legs.")),
+        Move(name: T("Köprü", "Glute bridge"), how: T("Sırtüstü yat, dizler bükük; kalçanı kaldır, sık, indir.", "Lie on your back, knees bent; lift your hips, squeeze, lower.")),
+        Move(name: T("Dağcı", "Mountain climbers"), how: T("Şınav pozisyonunda dizlerini sırayla göğsüne çek, hızlı.", "In a push-up position, drive your knees to your chest in turn, fast.")),
+        Move(name: T("Yerinde koş", "Run in place"), how: T("Yerinde hafif koş; son 20 saniye hızlan.", "Jog in place; speed up for the last 20 seconds.")),
+    ]
+    }
+}
+var MOVES: [Move] { movesFor(place: settings.place, goal: settings.goal) }
 /// Bir hareketin süresi (saniye)
 let MOVE_SEC: Double = isTrial ? 5 : 60
 
@@ -865,7 +906,8 @@ final class Controller {
         let withMusic = settings.music && !musicFiles().isEmpty
         render { cv, _ in
             let s = cv.s, cy = cv.cy
-            cv.view.addSubview(label(isTrial ? T("SPOR  ·  DENEME", "EXERCISE  ·  TRIAL") : T("SPOR  ·  \(SESSION_MIN) DAKİKA", "EXERCISE  ·  \(SESSION_MIN) MINUTES"), 14 * s, .semibold,
+            cv.view.addSubview(label(isTrial ? (settings.goal == "hareket" ? T("HAREKET  ·  DENEME", "MOVE  ·  TRIAL") : T("SPOR  ·  DENEME", "EXERCISE  ·  TRIAL")) : (settings.goal == "hareket" ? T("HAREKET  ·  \(SESSION_MIN) DAKİKA", "MOVE  ·  \(SESSION_MIN) MINUTES")
+                                                           : T("SPOR  ·  \(SESSION_MIN) DAKİKA", "EXERCISE  ·  \(SESSION_MIN) MINUTES")), 14 * s, .semibold,
                                      C_FAINT, cv.row(cy + 190 * s, 26 * s), tracking: 3))
             let clock = label("00:00", 150 * s, .medium, C_ACCENT, cv.row(cy - 10 * s, 180 * s), mono: true)
             cv.view.addSubview(clock)
@@ -1133,6 +1175,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     let sleepBox = NSButton(checkboxWithTitle: T("Uyku uyarıları", "Bedtime reminders"), target: nil, action: nil)
     let movesBox = NSButton(checkboxWithTitle: T("Hareket önerileri göster", "Show move suggestions"), target: nil, action: nil)
     let lang = NSPopUpButton(frame: .zero, pullsDown: false)
+    let placePop = NSPopUpButton(frame: .zero, pullsDown: false)
+    let goalPop = NSPopUpButton(frame: .zero, pullsDown: false)
     let awayBox = NSButton(checkboxWithTitle: T("Masadan zaten kalktıysan uyarma", "Skip if I already got up"), target: nil, action: nil)
     let volume = NSSlider(value: 80, minValue: 10, maxValue: 100, target: nil, action: nil)
     let volumeLabel = NSTextField(labelWithString: "")
@@ -1151,7 +1195,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 
     func show() {
-        let W: CGFloat = 520, H: CGFloat = 760, L: CGFloat = 32, X: CGFloat = 190
+        let W: CGFloat = 520, H: CGFloat = 800, L: CGFloat = 32, X: CGFloat = 190
         win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: W, height: H),
                        styleMask: [.titled, .closable], backing: .buffered, defer: false)
         win.title = T("Spor Vakti · Ayarlar", "Spor Vakti · Settings")
@@ -1215,19 +1259,28 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         movesBox.font = .systemFont(ofSize: 14, weight: .semibold)
         movesBox.state = settings.moves ? .on : .off
         v.addSubview(movesBox)
-        v.addSubview(text(T("Spor sırasında dakikada bir yeni hareket önerisi.", "A new move suggestion every minute during the session."), 12, .regular,
+        v.addSubview(text(T("Dakikada bir yeni öneri; nerede olduğuna ve amacına göre seçilir.", "A new suggestion every minute, picked for where you are and your goal."), 12, .regular,
                           C_MUTED, NSRect(x: L + 20, y: H - 396, width: W - 2 * L - 20, height: 18)))
 
+        // Nerede, ne amaçla
+        placePop.addItems(withTitles: [T("Ofisteyim", "At the office"), T("Evdeyim", "At home")])
+        placePop.selectItem(at: settings.place == "ev" ? 1 : 0)
+        placePop.frame = NSRect(x: L + 16, y: H - 434, width: 150, height: 26)
+        goalPop.addItems(withTitles: [T("Hareketsiz kalmayayım", "Just keep moving"), T("Spor yapayım", "Real exercise")])
+        goalPop.selectItem(at: settings.goal == "hareket" ? 0 : 1)
+        goalPop.frame = NSRect(x: L + 174, y: H - 434, width: 200, height: 26)
+        v.addSubview(placePop); v.addSubview(goalPop)
+
         // Masadan kalktıysan
-        awayBox.frame = NSRect(x: L - 2, y: H - 448, width: 360, height: 22)
+        awayBox.frame = NSRect(x: L - 2, y: H - 488, width: 360, height: 22)
         awayBox.font = .systemFont(ofSize: 14, weight: .semibold)
         awayBox.state = settings.skipIfAway ? .on : .off
         v.addSubview(awayBox)
         v.addSubview(text(T("Son aralıkta 5 dakikadan uzun bilgisayardan uzaktaysan o uyarı gelmez.", "No prompt if you were away for 5+ minutes during the last interval."), 12, .regular,
-                          C_MUTED, NSRect(x: L + 20, y: H - 472, width: W - 2 * L - 20, height: 18)))
+                          C_MUTED, NSRect(x: L + 20, y: H - 512, width: W - 2 * L - 20, height: 18)))
 
         // Müzik
-        musicBox.frame = NSRect(x: L - 2, y: H - 524, width: 300, height: 22)
+        musicBox.frame = NSRect(x: L - 2, y: H - 564, width: 300, height: 22)
         musicBox.font = .systemFont(ofSize: 14, weight: .semibold)
         musicBox.state = settings.music ? .on : .off
         v.addSubview(musicBox)
@@ -1236,28 +1289,28 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
                                       : T("Henüz parça yok. Klasöre mp3 ekle.", "No tracks yet. Add mp3 files to the folder.")
         musicInfo.font = .systemFont(ofSize: 12)
         musicInfo.textColor = C_MUTED
-        musicInfo.frame = NSRect(x: L + 20, y: H - 548, width: W - 2 * L - 20, height: 18)
+        musicInfo.frame = NSRect(x: L + 20, y: H - 588, width: W - 2 * L - 20, height: 18)
         v.addSubview(musicInfo)
         let open = NSButton(title: T("Müzik klasörünü aç", "Open music folder"), target: self, action: #selector(openMusic))
         open.bezelStyle = .rounded
-        open.frame = NSRect(x: L + 14, y: H - 624, width: 180, height: 30)
+        open.frame = NSRect(x: L + 14, y: H - 664, width: 180, height: 30)
         v.addSubview(open)
-        v.addSubview(text(T("Ses", "Volume"), 13, .medium, C_WHITE, NSRect(x: L + 20, y: H - 582, width: 60, height: 18)))
-        volume.frame = NSRect(x: L + 84, y: H - 586, width: 216, height: 24)
+        v.addSubview(text(T("Ses", "Volume"), 13, .medium, C_WHITE, NSRect(x: L + 20, y: H - 622, width: 60, height: 18)))
+        volume.frame = NSRect(x: L + 84, y: H - 626, width: 216, height: 24)
         volume.integerValue = settings.volume
         volume.target = self; volume.action = #selector(volumeChanged)
         v.addSubview(volume)
         volumeLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
         volumeLabel.textColor = C_MUTED
-        volumeLabel.frame = NSRect(x: L + 308, y: H - 582, width: 50, height: 18)
+        volumeLabel.frame = NSRect(x: L + 308, y: H - 622, width: 50, height: 18)
         v.addSubview(volumeLabel)
         volumeChanged()
 
         // Dil
-        v.addSubview(text(T("Dil", "Language"), 14, .semibold, C_WHITE, NSRect(x: L, y: H - 676, width: 150, height: 20)))
+        v.addSubview(text(T("Dil", "Language"), 14, .semibold, C_WHITE, NSRect(x: L, y: H - 716, width: 150, height: 20)))
         lang.addItems(withTitles: [T("Sistem dili", "System language"), "Türkçe", "English"])
         lang.selectItem(at: ["auto", "tr", "en"].firstIndex(of: settings.language) ?? 0)
-        lang.frame = NSRect(x: X, y: H - 680, width: 180, height: 26)
+        lang.frame = NSRect(x: X, y: H - 720, width: 180, height: 26)
         v.addSubview(lang)
 
         warn.font = .systemFont(ofSize: 12, weight: .medium)
@@ -1336,6 +1389,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         s.moves = movesBox.state == .on
         s.skipIfAway = awayBox.state == .on
         s.language = ["auto", "tr", "en"][max(0, lang.indexOfSelectedItem)]
+        s.place = placePop.indexOfSelectedItem == 1 ? "ev" : "ofis"
+        s.goal = goalPop.indexOfSelectedItem == 0 ? "hareket" : "spor"
         s.volume = volume.integerValue
         do {
             try s.save()
