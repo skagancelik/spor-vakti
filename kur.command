@@ -12,6 +12,9 @@ mkdir -p "$APP_DIR" "$HOME/Library/LaunchAgents"
 echo "-- derleniyor"
 /usr/bin/swiftc -O -o "$APP_DIR/spor-vakti" "$SRC/src/main.swift"
 cp "$SRC/scripts/run.sh" "$APP_DIR/run.sh"
+# Spor sırasında çalan müzikler (repodaki muzik/ klasörü)
+rm -rf "$APP_DIR/muzik"
+cp -R "$SRC/muzik" "$APP_DIR/muzik" 2>/dev/null || mkdir -p "$APP_DIR/muzik"
 chmod +x "$APP_DIR/spor-vakti" "$APP_DIR/run.sh"
 
 echo "-- LaunchAgent yazılıyor"
@@ -50,5 +53,5 @@ PL
 
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
-echo "✅ Kuruldu. Saat başı (07:00–23:00) spor (ertelersen o günkü düzen 5 dk kayar), 23:30 ve 23:59'da uyku uyarısı gelecek."
-echo "   Denemek için: deneme.command"
+echo "✅ Kuruldu. 07:00–23:00 arası spor uyarısı (varsayılan saat başı; ertelersen o günkü düzen 5 dk kayar), 23:30 ve 23:59'da uyku uyarısı gelecek."
+echo "   Aralık, süre ve müzik için: ayarlar.command   ·   Denemek için: deneme.command"

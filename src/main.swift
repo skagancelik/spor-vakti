@@ -2,6 +2,7 @@
 // Hiçbir ağ bağlantısı kurmaz; tüm veriler yerel CSV dosyasında kalır.
 
 import AppKit
+import AVFoundation
 import CoreAudio
 import Foundation
 
@@ -15,8 +16,56 @@ let isTrial = args.contains("--deneme")
 enum Notice: String { case prepare = "uyku-hazirlik", sleep = "uyku" }
 let notice = args.compactMap(Notice.init(rawValue:)).first
 
-/// Bir seansın süresi (dakika). SPOR_VAKTI_DK ile değiştirilebilir.
-let SESSION_MIN: Int = max(1, Int(env["SPOR_VAKTI_DK"] ?? "") ?? 10)
+/// Ayar ekranı:  spor-vakti ayarlar
+let isSettings = args.first == "ayarlar"
+
+/// Verilerin durduğu klasör (geçmiş, erteleme, ayarlar, kişisel müzik)
+let DATA_DIR: URL = {
+    let base = env["SPOR_VAKTI_DATA"].map { URL(fileURLWithPath: $0) }
+        ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("SporVakti")
+    try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+    return base
+}()
+
+/// Kullanıcı ayarları: DATA_DIR/ayarlar (anahtar=değer satırları; run.sh de okur)
+struct Settings {
+    /// İki spor uyarısı arası (dakika, 5'in katı). 07:00'den başlayarak sayılır.
+    var intervalMin = 60
+    /// Bir seansın süresi (dakika)
+    var sessionMin = 10
+    /// Seans boyunca muzik klasöründeki parçaları çal
+    var music = true
+
+    static let url = DATA_DIR.appendingPathComponent("ayarlar")
+    static let minInterval = 15
+
+    static func load() -> Settings {
+        var s = Settings()
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return s }
+        for line in text.split(separator: "\n") {
+            let kv = line.split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+            guard kv.count == 2 else { continue }
+            switch kv[0] {
+            case "aralik_dk": if let v = Int(kv[1]), v >= minInterval { s.intervalMin = v }
+            case "sure_dk":   if let v = Int(kv[1]), v >= 1 { s.sessionMin = v }
+            case "muzik":     s.music = kv[1] != "0"
+            default: break
+            }
+        }
+        return s
+    }
+
+    func save() throws {
+        let text = "aralik_dk=\(intervalMin)\nsure_dk=\(sessionMin)\nmuzik=\(music ? 1 : 0)\n"
+        try text.write(to: Settings.url, atomically: true, encoding: .utf8)
+    }
+}
+
+let settings = Settings.load()
+
+/// Bir seansın süresi (dakika). Ayar ekranından seçilir; SPOR_VAKTI_DK ortam değişkeni hepsinin önüne geçer.
+let SESSION_MIN: Int = max(1, Int(env["SPOR_VAKTI_DK"] ?? "") ?? settings.sessionMin)
 /// Deneme modunda seans 20 saniye sürer ve kayıt tutulmaz.
 let SESSION_SEC: Double = isTrial ? 20 : Double(SESSION_MIN * 60)
 /// Bu süre içinde cevap verilmezse seans "cevapsız" (pas) sayılır.
@@ -56,26 +105,22 @@ final class Journal {
     static let header = "tarih,saat,sonuc,plan_dk,yapilan_dk\n"
 
     init() {
-        let base = env["SPOR_VAKTI_DATA"].map { URL(fileURLWithPath: $0) }
-            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("SporVakti")
-        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-        url = base.appendingPathComponent("gecmis.csv")
-        shiftURL = base.appendingPathComponent("erteleme")
+        url = DATA_DIR.appendingPathComponent("gecmis.csv")
+        shiftURL = DATA_DIR.appendingPathComponent("erteleme")
     }
 
-    /// Bugünkü toplam kayma (dakika, 0–55). Başka güne aitse 0.
+    /// Bugünkü toplam kayma (dakika, aralıktan küçük). Başka güne aitse 0.
     func todayShift() -> Int {
         guard let text = try? String(contentsOf: shiftURL, encoding: .utf8) else { return 0 }
         let c = text.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ",").map(String.init)
         guard c.count == 2, c[0] == Journal.dayFmt.string(from: Date()), let m = Int(c[1]) else { return 0 }
-        return m % 60
+        return m % settings.intervalMin
     }
 
     /// Düzeni SNOOZE_MIN kaydırır: bu uyarı ve bugünkü sonrakiler o kadar geç gelir.
     func snooze() {
         if isTrial { return }
-        let m = (todayShift() + SNOOZE_MIN) % 60
+        let m = (todayShift() + SNOOZE_MIN) % settings.intervalMin
         try? "\(Journal.dayFmt.string(from: Date())),\(m)\n".write(to: shiftURL, atomically: true, encoding: .utf8)
     }
 
@@ -194,9 +239,70 @@ if args.first == "paylasim-kontrol" {
     exit(0)
 }
 
-if !isTrial {
+if !isTrial && !isSettings {
     if let app = microphoneUser() { print("atlandı: mikrofon kullanımda (\(app))"); exit(0) }
     if sharingWindowVisible() { print("atlandı: ekran paylaşılıyor"); exit(0) }
+}
+
+// MARK: - Müzik
+// Seans başlayınca muzik klasörlerindeki parçalar karışık sırayla çalar, seans bitince durur.
+// 1) Uygulamanın yanındaki "muzik" klasörü (repodaki muzik/, kur.command kopyalar)
+// 2) DATA_DIR/muzik: kişisel parçalar (güncellemede silinmez)
+
+let MUSIC_EXT: Set<String> = ["mp3", "m4a", "aac", "wav", "aiff", "aif"]
+let APP_MUSIC_DIR: URL = (Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0]))
+    .resolvingSymlinksInPath().deletingLastPathComponent().appendingPathComponent("muzik")
+let USER_MUSIC_DIR: URL = DATA_DIR.appendingPathComponent("muzik")
+
+func musicFiles() -> [URL] {
+    var dirs = [APP_MUSIC_DIR, USER_MUSIC_DIR]
+    if let extra = env["SPOR_VAKTI_MUZIK"] { dirs.insert(URL(fileURLWithPath: extra), at: 0) }
+    return dirs.flatMap { dir -> [URL] in
+        let items = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+        return items.filter { MUSIC_EXT.contains($0.pathExtension.lowercased()) }
+    }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+}
+
+final class MusicPlayer: NSObject, AVAudioPlayerDelegate {
+    private var queue: [URL] = []
+    private var player: AVAudioPlayer?
+    private var playing = false
+    private var failures = 0
+
+    func start() {
+        queue = musicFiles().shuffled()
+        guard !queue.isEmpty else { print("müzik: parça yok (\(APP_MUSIC_DIR.path))"); return }
+        playing = true
+        failures = 0
+        playNext()
+    }
+
+    /// Liste bitince başa döner; seans sürdükçe çalar.
+    private func playNext() {
+        guard playing, !queue.isEmpty else { return }
+        let url = queue.removeFirst()
+        queue.append(url)
+        if let p = try? AVAudioPlayer(contentsOf: url), p.play() {
+            p.delegate = self
+            player = p
+            failures = 0
+        } else {
+            print("müzik: çalınamadı \(url.lastPathComponent)")
+            failures += 1
+            if failures < queue.count { playNext() } else { playing = false }
+        }
+    }
+
+    func audioPlayerDidFinishPlaying(_ p: AVAudioPlayer, successfully flag: Bool) { playNext() }
+
+    /// Sesi kısarak durdurur.
+    func stop() {
+        guard playing else { return }
+        playing = false
+        guard let p = player else { return }
+        p.setVolume(0, fadeDuration: 1.5)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { p.stop() }
+    }
 }
 
 // MARK: - Arayüz yardımcıları
@@ -324,6 +430,7 @@ final class Controller {
     var miniClock: NSTextField?
     var start = Date()
     let triggeredAt = Date()
+    let music = MusicPlayer()
 
     // MARK: Pencereler
 
@@ -615,6 +722,7 @@ final class Controller {
         }
 
         start = Date()
+        if settings.music { music.start() }
         tick()
         let t = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in self?.tick() }
         RunLoop.main.add(t, forMode: .common)
@@ -700,6 +808,7 @@ final class Controller {
     func finishWorkout(early: Bool) {
         guard phase == .workout else { return }
         timer?.invalidate()
+        music.stop()
         expand()
         let elapsed = Date().timeIntervalSince(start)
         let doneMin = early ? min(SESSION_MIN, Int(elapsed / 60)) : SESSION_MIN
@@ -776,7 +885,149 @@ final class Controller {
     }
 }
 
+// MARK: - Ayar ekranı:  spor-vakti ayarlar
+
+final class SettingsWindow: NSObject, NSWindowDelegate {
+    var win: NSWindow!
+    let hours = NSPopUpButton(frame: .zero, pullsDown: false)
+    let mins = NSPopUpButton(frame: .zero, pullsDown: false)
+    let dur = NSPopUpButton(frame: .zero, pullsDown: false)
+    let musicBox = NSButton(checkboxWithTitle: "Spor boyunca müzik çal", target: nil, action: nil)
+    let musicInfo = NSTextField(labelWithString: "")
+    let warn = NSTextField(labelWithString: "")
+    let saveBtn = NSButton(title: "Kaydet", target: nil, action: nil)
+
+    func text(_ str: String, _ size: CGFloat, _ weight: NSFont.Weight, _ color: NSColor, _ frame: NSRect) -> NSTextField {
+        let t = NSTextField(labelWithString: str)
+        t.font = .systemFont(ofSize: size, weight: weight)
+        t.textColor = color
+        t.frame = frame
+        return t
+    }
+
+    func show() {
+        let W: CGFloat = 480, H: CGFloat = 430, L: CGFloat = 32
+        win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: W, height: H),
+                       styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        win.title = "Spor Vakti · Ayarlar"
+        win.appearance = NSAppearance(named: .darkAqua)
+        win.backgroundColor = C_BG1
+        win.isReleasedWhenClosed = false
+        win.delegate = self
+        let v = win.contentView!
+
+        v.addSubview(text("Ayarlar", 24, .bold, C_WHITE, NSRect(x: L, y: H - 62, width: 300, height: 32)))
+
+        // Aralık: saat + dakika
+        v.addSubview(text("Spor aralığı", 14, .semibold, C_WHITE, NSRect(x: L, y: H - 112, width: 160, height: 20)))
+        hours.addItems(withTitles: (0...6).map { "\($0) saat" })
+        mins.addItems(withTitles: stride(from: 0, through: 55, by: 5).map { "\($0) dk" })
+        hours.frame = NSRect(x: 200, y: H - 116, width: 110, height: 26)
+        mins.frame = NSRect(x: 318, y: H - 116, width: 110, height: 26)
+        let iv = settings.intervalMin
+        hours.selectItem(at: min(6, iv / 60))
+        mins.selectItem(at: (iv % 60) / 5)
+        v.addSubview(hours); v.addSubview(mins)
+        v.addSubview(text("Uyarılar 07:00'den başlar, bu aralıkla tekrar eder (23:30'a kadar).", 12, .regular, C_MUTED,
+                          NSRect(x: L, y: H - 144, width: W - 2 * L, height: 18)))
+
+        // Süre
+        v.addSubview(text("Spor süresi", 14, .semibold, C_WHITE, NSRect(x: L, y: H - 190, width: 160, height: 20)))
+        dur.addItems(withTitles: (1...60).map { "\($0) dk" })
+        dur.frame = NSRect(x: 200, y: H - 194, width: 110, height: 26)
+        dur.selectItem(at: min(60, settings.sessionMin) - 1)
+        v.addSubview(dur)
+
+        // Müzik
+        musicBox.frame = NSRect(x: L - 2, y: H - 246, width: 300, height: 22)
+        musicBox.font = .systemFont(ofSize: 14, weight: .semibold)
+        musicBox.state = settings.music ? .on : .off
+        v.addSubview(musicBox)
+        let n = musicFiles().count
+        musicInfo.stringValue = n > 0 ? "\(n) parça bulundu. Karışık sırayla çalar, süre bitince durur."
+                                      : "Henüz parça yok. Klasöre mp3 ekle."
+        musicInfo.font = .systemFont(ofSize: 12)
+        musicInfo.textColor = C_MUTED
+        musicInfo.frame = NSRect(x: L + 20, y: H - 270, width: W - 2 * L - 20, height: 18)
+        v.addSubview(musicInfo)
+        let open = NSButton(title: "Müzik klasörünü aç", target: self, action: #selector(openMusic))
+        open.bezelStyle = .rounded
+        open.frame = NSRect(x: L + 14, y: H - 306, width: 180, height: 30)
+        v.addSubview(open)
+
+        warn.font = .systemFont(ofSize: 12, weight: .medium)
+        warn.textColor = C_WARN
+        warn.frame = NSRect(x: L, y: 70, width: W - 2 * L, height: 18)
+        v.addSubview(warn)
+
+        let cancel = NSButton(title: "Vazgeç", target: self, action: #selector(close))
+        cancel.bezelStyle = .rounded
+        cancel.keyEquivalent = "\u{1b}"
+        cancel.frame = NSRect(x: W - L - 220, y: 24, width: 104, height: 32)
+        saveBtn.target = self
+        saveBtn.action = #selector(save)
+        saveBtn.bezelStyle = .rounded
+        saveBtn.keyEquivalent = "\r"
+        saveBtn.frame = NSRect(x: W - L - 108, y: 24, width: 108, height: 32)
+        v.addSubview(cancel); v.addSubview(saveBtn)
+
+        for p in [hours, mins, dur] { p.target = self; p.action = #selector(validate) }
+        validate()
+
+        win.center()
+        win.makeKeyAndOrderFront(nil)
+        // Terminal/arka plandan açılınca da diğer pencerelerin önüne gelsin
+        win.orderFrontRegardless()
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    var interval: Int { hours.indexOfSelectedItem * 60 + mins.indexOfSelectedItem * 5 }
+    var duration: Int { dur.indexOfSelectedItem + 1 }
+
+    @objc func validate() {
+        var msg = ""
+        if interval < Settings.minInterval {
+            msg = "Aralık en az \(Settings.minInterval) dakika olmalı."
+        } else if duration >= interval {
+            msg = "Spor süresi aralıktan kısa olmalı."
+        }
+        warn.stringValue = msg
+        saveBtn.isEnabled = msg.isEmpty
+    }
+
+    @objc func openMusic() {
+        // Kişisel klasör: güncellemede (kur.command) silinmez
+        try? FileManager.default.createDirectory(at: USER_MUSIC_DIR, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(USER_MUSIC_DIR)
+    }
+
+    @objc func save() {
+        validate()
+        guard saveBtn.isEnabled else { return }
+        var s = settings
+        s.intervalMin = interval
+        s.sessionMin = duration
+        s.music = musicBox.state == .on
+        do {
+            try s.save()
+            print("ayarlar kaydedildi: aralık \(s.intervalMin) dk, süre \(s.sessionMin) dk, müzik \(s.music ? "açık" : "kapalı")")
+            close()
+        } catch {
+            warn.stringValue = "Kaydedilemedi: \(error.localizedDescription)"
+        }
+    }
+
+    @objc func close() { win.close() }
+    func windowWillClose(_ notification: Notification) { exit(0) }
+}
+
 let app = NSApplication.shared
+if isSettings {
+    app.setActivationPolicy(.regular)
+    let settingsWindow = SettingsWindow()
+    settingsWindow.show()
+    app.run()
+}
 app.setActivationPolicy(.accessory)
 let controller = Controller()
 controller.setup()

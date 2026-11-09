@@ -16,10 +16,10 @@ Sana ne yapacağını söylemez. Ama sana sorar: **gerçekten yapıyor musun, yo
 
 | | |
 |---|---|
-| ![Soru](docs/1-spor-vakti.png) | **Saat başı (07:00–23:00):** Tam ekran "Spor vakti." Bugünkü durumun altta: seans, dakika, pas. |
+| ![Soru](docs/1-spor-vakti.png) | **Saat başı (07:00–23:00, aralık ayarlanabilir):** Tam ekran "Spor vakti." Bugünkü durumun altta: seans, dakika, pas. |
 | | **Şimdi olmuyorsa:** **5 dk ertele** (ya da `E`). Pas sayılmaz; uyarı 5 dk sonra gelir ve o günün düzeni de 5 dk kayar (14:00 ertelendiyse 14:05, sonraki 15:05). Her erteleme 5 dk daha kaydırır; ertesi gün saat başına döner. |
 | ![Emin misin](docs/2-emin-misin.png) | **Pas geçmek istersen:** "Bugün 2. pas olacak. Bugün toplam 20 dakika spordan mahrum kalacaksın." Kutuya **evet** yazınca **Pas geç** düğmesi açılır. **Spora başla** her zaman orada. |
-| ![Seans](docs/3-seans.png) | **Başlıyorum dersen:** 10 dakikalık geri sayım. Erken bitirirsen eksik kalan dakikalar da sayılır. **Küçült · müzik aç** (ya da `M`) ile ekran köşede küçük bir sayaca dönüşür: müzik açabilir, bilgisayarı kullanabilirsin; seans sürer, pas sayılmaz. Süre bitince tam ekran geri gelir. |
+| ![Seans](docs/3-seans.png) | **Başlıyorum dersen:** 10 dakikalık (ayarlanabilir) geri sayım; müzik açıksa süre boyunca çalar. Erken bitirirsen eksik kalan dakikalar da sayılır. **Küçült · müzik aç** (ya da `M`) ile ekran köşede küçük bir sayaca dönüşür: müzik açabilir, bilgisayarı kullanabilirsin; seans sürer, pas sayılmaz. Süre bitince tam ekran geri gelir. |
 | ![Tamamlandı](docs/4-tamamlandi.png) | **Bitince:** Bugün kaçıncı seans olduğu ve toplam spor süresi. |
 | ![Uyku hazırlığı](docs/5-uyku-hazirlik.png) | **23:30:** "Uyumak için hazırlıklarını yap." |
 | ![Uyku vakti](docs/6-uyku-vakti.png) | **23:59:** "Uyku vakti." Gece uyarıları yalnızca **Tamam** ile kapanır. |
@@ -52,13 +52,19 @@ Ya da Finder'da dosyalara çift tıkla:
 | `kur.command` | Derler, kurar, zamanlayıcıyı başlatır. Güncelleme için de tekrar çalıştır. |
 | `deneme.command` | Ekranları dener (20 sn'lik spor + iki gece uyarısı). İstatistiğe yazılmaz. |
 | `rapor.command` | Son 7 günün tablosu: seans, spor dakikası, pas, mahrum kalınan dakika. |
+| `ayarlar.command` | Ayar ekranı: spor aralığı, spor süresi, müzik. |
 | `duraklat.command` | Geçici olarak durdurur / yeniden açar. |
 | `kaldir.command` | Kaldırır. Geçmiş verin silinmez. |
 
 ### Ayarlar
 
-- Seans süresi varsayılan **10 dakika**. Değiştirmek için `SPOR_VAKTI_DK` ortam değişkenini kullan.
-- Saatler `kur.command` içindeki LaunchAgent tanımında, kurallar `scripts/run.sh` içinde.
+`ayarlar.command` ile açılan ekrandan:
+
+- **Spor aralığı:** kaç saat kaç dakikada bir (5 dk adımlarla, en az 15 dk). Varsayılan **1 saat**. Uyarılar 07:00'den başlar ve bu aralıkla tekrar eder (ör. 1 saat 30 dk → 07:00, 08:30, 10:00…).
+- **Spor süresi:** 1–60 dakika. Varsayılan **10 dakika**.
+- **Müzik:** açıksa spor başlayınca `muzik/` klasöründeki parçalar karışık sırayla çalar, süre bitince (ya da erken bitirince) durur. Repoya eklenen parçalar `kur.command` ile kurulur; repoyu indiren herkes kullanır. Yalnızca kendine ait parçaları `~/Library/Application Support/SporVakti/muzik` klasörüne koyabilirsin (ayar ekranındaki **Müzik klasörünü aç**).
+
+Ayarlar `~/Library/Application Support/SporVakti/ayarlar` dosyasında durur. `SPOR_VAKTI_DK` ortam değişkeni seans süresinin önüne geçer.
 
 ### Gizlilik
 
@@ -76,7 +82,7 @@ It doesn't tell you what to do. It asks: **are you actually doing it, or skippin
 
 ### How it works
 
-- **Every hour (07:00–23:00):** a full-screen "Spor vakti." prompt with today's tally (sessions, minutes, skips).
+- **Every hour (07:00–23:00, interval configurable):** a full-screen "Spor vakti." prompt with today's tally (sessions, minutes, skips).
 - **Not now?** **5 dk ertele** (or `E`) snoozes 5 minutes without counting as a skip, and shifts the rest of the day's schedule by 5 minutes too (snooze 14:00 → 14:05, next one at 15:05). Each snooze adds another 5; the next day starts on the hour again.
 - **Skip?** A confirmation screen shows the cost ("This will be skip #2 today, 20 minutes missed"). Typing **evet** ("yes") unlocks the **Pas geç** (Skip) button; **Spora başla** (Start) is always there. Your choice is recorded explicitly.
 - **Start?** A 10-minute countdown. Ending early still counts the missing minutes. **Küçült · müzik aç** (or `M`) shrinks it to a small corner timer so you can put on music or use the computer; the session keeps running and is not a skip. It returns to full screen when time is up.
@@ -102,9 +108,9 @@ cd spor-vakti
 ./kur.command
 ```
 
-The `.command` scripts can also be double-clicked in Finder: `kur` (install/update), `deneme` (try the screens, nothing is recorded), `rapor` (7-day report), `duraklat` (pause/resume), `kaldir` (uninstall; history is kept).
+The `.command` scripts can also be double-clicked in Finder: `kur` (install/update), `deneme` (try the screens, nothing is recorded), `rapor` (7-day report), `ayarlar` (settings), `duraklat` (pause/resume), `kaldir` (uninstall; history is kept).
 
-Session length defaults to **10 minutes**. Override it with the `SPOR_VAKTI_DK` environment variable.
+`ayarlar.command` (settings) lets you pick the workout interval (hours + minutes, 5-minute steps, at least 15 min; default 1 hour, counted from 07:00), the session length (1–60 min; default 10), and whether to play music during the session. Music comes from the repo's `muzik/` folder (installed by `kur.command`) plus your personal `~/Library/Application Support/SporVakti/muzik`; it plays shuffled while the session runs and stops when it ends.
 
 ### Privacy
 
