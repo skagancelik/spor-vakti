@@ -41,6 +41,21 @@ if [ "$1" != "--deneme" ]; then
   START=$(ayar baslangic_dk 420)   # 07:00
   END=$(ayar bitis_dk 1380)        # 23:00 (dahil)
   SLEEP=$(ayar uyku_uyarisi 1)
+  AWAY_SKIP=$(ayar kalkinca_atla 1)
+
+  # Masadan kalkma takibi: her çağrıda (5 dk'da bir) klavye/fare ne kadardır boşta bakılır.
+  # 5 dk'dan uzun boştaysa "son_uzak" zamanı yazılır; aynı aralık içinde zaten kalktıysan uyarı gelmez.
+  IDLE=${SPOR_VAKTI_BOSTA:-$(ioreg -c IOHIDSystem 2>/dev/null | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}')}
+  NOWS=$(date +%s)
+  # Spor seansının kendisi "uzakta" sayılmaz: uzaklık son seans bittikten sonra başlamış olmalı
+  LAST_END=""; [ -f "$DATA_DIR/son_seans" ] && LAST_END=$(tr -dc '0-9' < "$DATA_DIR/son_seans")
+  AWAY_REAL=0
+  if [ -n "$IDLE" ] && [ "$IDLE" -ge 300 ] && [ $(( NOWS - IDLE )) -gt "${LAST_END:-0}" ] \
+     && ! ps -axo args= | grep -E "^$BIN( |$)" | grep -vqE " (menu|ayarlar)$"; then AWAY_REAL=1; fi
+  if [ "$AWAY_REAL" = 1 ] && [ "$KURU" != 1 ]; then echo "$NOWS" > "$DATA_DIR/son_uzak"; fi
+  AWAY_AGO=""
+  if [ "$AWAY_REAL" = 1 ]; then AWAY_AGO=0
+  elif [ -f "$DATA_DIR/son_uzak" ]; then A=$(tr -dc '0-9' < "$DATA_DIR/son_uzak"); [ -n "$A" ] && AWAY_AGO=$(( NOWS - A )); fi
   if [ "$START" -ge 1440 ] || [ "$END" -ge 1440 ] || [ "$END" -le "$START" ]; then START=420; END=1380; fi
 
   # Erteleme: her "5 dk ertele" o günün düzenini 5 dk kaydırır
@@ -70,6 +85,9 @@ if [ "$1" != "--deneme" ]; then
   elif [ "$SLEEP" = 1 ] && [ "$HOUR" -eq 23 ] && [ "$MIN" -ge 30 ]; then
     karar "atla: gece uyarısı saati"; log "atlandı: gece uyarısı saati (:$MIN)"; exit 0
   fi
+  if [ "${#ARGS[@]}" -eq 0 ] && [ "$AWAY_SKIP" = 1 ] && [ -n "$AWAY_AGO" ] && [ "$AWAY_AGO" -lt $(( INTERVAL * 60 )) ]; then
+    karar "atla: masadan zaten kalktın"; log "atlandı: son aralıkta masadan kalktın ($((AWAY_AGO / 60)) dk önce)"; exit 0
+  fi
   karar "${ARGS[*]:-spor}"
 
   # Zoom ekran paylaşırken CptHost süreci çalışır — karşı taraf uyarıyı görmesin
@@ -87,7 +105,6 @@ if [ "$1" != "--deneme" ]; then
   fi
 
   # 10 dakikadan uzun süredir klavye/fare kullanılmıyorsa zaten masada değilsin
-  IDLE=$(ioreg -c IOHIDSystem 2>/dev/null | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}')
   if [ -n "$IDLE" ] && [ "$IDLE" -gt 600 ]; then
     log "atlandı: ${IDLE}sn'dir klavye/fare hareketi yok"; exit 0
   fi
