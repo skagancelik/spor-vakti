@@ -45,6 +45,10 @@ struct Settings {
     var sessionMin = 10
     /// Seans boyunca muzik klasöründeki parçaları çal
     var music = true
+    /// Müzik ses seviyesi (%10–100)
+    var volume = 80
+    /// Seans sırasında dakikada bir değişen hareket önerileri
+    var moves = true
 
     static let url = DATA_DIR.appendingPathComponent("ayarlar")
     static let minInterval = 15
@@ -62,6 +66,8 @@ struct Settings {
             case "baslangic_dk": if let v = Int(kv[1]), (0..<1440).contains(v) { s.startMin = v }
             case "bitis_dk":     if let v = Int(kv[1]), (0..<1440).contains(v) { s.endMin = v }
             case "uyku_uyarisi": s.sleepNotices = kv[1] != "0"
+            case "ses":          if let v = Int(kv[1]) { s.volume = min(100, max(10, v)) }
+            case "hareket":      s.moves = kv[1] != "0"
             default: break
             }
         }
@@ -71,6 +77,7 @@ struct Settings {
     func save() throws {
         let text = "aralik_dk=\(intervalMin)\nsure_dk=\(sessionMin)\nmuzik=\(music ? 1 : 0)\n"
             + "baslangic_dk=\(startMin)\nbitis_dk=\(endMin)\nuyku_uyarisi=\(sleepNotices ? 1 : 0)\n"
+            + "ses=\(volume)\nhareket=\(moves ? 1 : 0)\n"
         try text.write(to: Settings.url, atomically: true, encoding: .utf8)
     }
 }
@@ -356,7 +363,9 @@ final class MusicPlayer: NSObject, AVAudioPlayerDelegate {
         guard playing, !queue.isEmpty else { return }
         let url = queue.removeFirst()
         queue.append(url)
-        if let p = try? AVAudioPlayer(contentsOf: url), p.play() {
+        if let p = try? AVAudioPlayer(contentsOf: url) {
+            p.volume = Float(settings.volume) / 100
+            guard p.play() else { failures += 1; if failures < queue.count { playNext() }; return }
             p.delegate = self
             player = p
             failures = 0
@@ -369,6 +378,15 @@ final class MusicPlayer: NSObject, AVAudioPlayerDelegate {
 
     func audioPlayerDidFinishPlaying(_ p: AVAudioPlayer, successfully flag: Bool) { playNext() }
 
+    var isPlaying: Bool { playing }
+
+    /// Sıradaki parçaya geç
+    func skip() {
+        guard playing else { return }
+        player?.stop()
+        playNext()
+    }
+
     /// Sesi kısarak durdurur.
     func stop() {
         guard playing else { return }
@@ -378,6 +396,23 @@ final class MusicPlayer: NSObject, AVAudioPlayerDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { p.stop() }
     }
 }
+
+// MARK: - Hareket önerileri
+// Ekipmansız, masa başında yapılabilen hareketler. Seans boyunca dakikada bir sıradakine geçilir.
+
+struct Move { let name: String; let how: String }
+let MOVES: [Move] = [
+    Move(name: "Sandalyeden kalk, otur", how: "Sandalyenin önünde dur; oturur gibi in, dokunmadan kalk. Sırtın dik."),
+    Move(name: "Masaya dayanarak şınav", how: "Ellerini masanın kenarına koy, gövdeni düz tutarak in ve it."),
+    Move(name: "Parmak ucunda yüksel", how: "Topuklarını kaldır, bir saniye bekle, yavaşça indir."),
+    Move(name: "Yerinde diz çek", how: "Dizlerini sırayla bel hizasına kaldır; kollar da eşlik etsin."),
+    Move(name: "Duvarda otur", how: "Sırtını duvara daya, dizlerin 90 derece olana kadar in, bekle."),
+    Move(name: "Omuz çevir", how: "Omuzlarını büyük daireler çizerek geriye, sonra öne çevir."),
+    Move(name: "Göğsünü aç", how: "Ellerini arkada birleştir, göğsünü öne it, derin nefes al."),
+    Move(name: "Tempolu yürü", how: "Odada ya da koridorda hızlı adımlarla yürü."),
+]
+/// Bir hareketin süresi (saniye)
+let MOVE_SEC: Double = isTrial ? 5 : 60
 
 // MARK: - Arayüz yardımcıları
 
@@ -504,6 +539,12 @@ final class Controller {
     var miniClock: NSTextField?
     /// Spor ekranından açılan ayar penceresi
     var settingsWindow: SettingsWindow?
+    /// Hareket önerisi etiketleri (her ekranda) ve bu seansın başlangıç hareketi
+    var moveNames: [NSTextField] = []
+    var moveHows: [NSTextField] = []
+    var moveNexts: [NSTextField] = []
+    var moveOffset = Int.random(in: 0..<MOVES.count)
+    var moveIndex = -1
     var start = Date()
     let triggeredAt = Date()
     let music = MusicPlayer()
@@ -556,6 +597,7 @@ final class Controller {
     func render(_ build: (Canvas, Int) -> Void) {
         contents.forEach { $0.removeFromSuperview() }
         contents = []; clocks = []; fills = []; barW = []; confirmHints = []; passButtons = []
+        moveNames = []; moveHows = []; moveNexts = []
         for (i, root) in roots.enumerated() {
             let c = NSView(frame: root.bounds)
             c.alphaValue = 0
@@ -578,6 +620,7 @@ final class Controller {
         case .settings: break
         case .confirm: if esc { showPrompt(first: false) }
         case .workout: if esc { finishWorkout(early: true) } else if code == 46 { minimize() }  // M
+                       else if code == 45 { music.skip() }  // N
         case .summary: quit()
         case .notice:  if enter { quit() }
         }
@@ -802,6 +845,8 @@ final class Controller {
         guard phase == .prompt || phase == .confirm else { return }
         deadline?.invalidate()
         phase = .workout
+        let showMoves = settings.moves
+        let withMusic = settings.music && !musicFiles().isEmpty
         render { cv, _ in
             let s = cv.s, cy = cv.cy
             cv.view.addSubview(label(isTrial ? "SPOR  ·  DENEME" : "SPOR  ·  \(SESSION_MIN) DAKİKA", 14 * s, .semibold,
@@ -821,23 +866,42 @@ final class Controller {
             track.addSubview(fill)
             cv.view.addSubview(track)
 
-            cv.view.addSubview(label("Bilgisayar seni bekler.", 22 * s, .regular, C_MUTED,
-                                     cv.row(cy - 100 * s, 34 * s)))
+            if showMoves {
+                let name = label(" ", 36 * s, .bold, C_WHITE, cv.row(cy - 100 * s, 48 * s))
+                let how = label(" ", 20 * s, .regular, C_MUTED, cv.row(cy - 138 * s, 30 * s))
+                let next = label(" ", 14 * s, .medium, C_FAINT, cv.row(cy - 168 * s, 22 * s), tracking: 1)
+                cv.view.addSubview(name); cv.view.addSubview(how); cv.view.addSubview(next)
+                self.moveNames.append(name); self.moveHows.append(how); self.moveNexts.append(next)
+            } else {
+                cv.view.addSubview(label("Bilgisayar seni bekler.", 22 * s, .regular, C_MUTED,
+                                         cv.row(cy - 100 * s, 34 * s)))
+            }
 
-            let ew = 240 * s, eh = 52 * s, gap = 18 * s
-            let x0 = (cv.w - (ew * 2 + gap)) / 2
+            // Düğmeler: Küçült · (Sonraki parça) · Erken bitir
+            let ew = 230 * s, eh = 52 * s, gap = 16 * s
+            let count = CGFloat(withMusic ? 3 : 2)
+            let x0 = (cv.w - (ew * count + gap * (count - 1))) / 2
+            let by = cy - (showMoves ? 250 : 190) * s
+            var x = x0
             let shrink = ActionButton("Küçült · müzik aç", primary: false,
-                                      frame: NSRect(x: x0, y: cy - 190 * s, width: ew, height: eh),
-                                      fontSize: 17 * s)
+                                      frame: NSRect(x: x, y: by, width: ew, height: eh), fontSize: 17 * s)
             shrink.handler = { [weak self] in self?.minimize() }
+            cv.view.addSubview(shrink)
+            x += ew + gap
+            if withMusic {
+                let skip = ActionButton("Sonraki parça", primary: false,
+                                        frame: NSRect(x: x, y: by, width: ew, height: eh), fontSize: 17 * s)
+                skip.handler = { [weak self] in self?.music.skip() }
+                cv.view.addSubview(skip)
+                x += ew + gap
+            }
             let early = ActionButton("Erken bitir", primary: false,
-                                     frame: NSRect(x: x0 + ew + gap, y: cy - 190 * s, width: ew, height: eh),
-                                     fontSize: 17 * s)
+                                     frame: NSRect(x: x, y: by, width: ew, height: eh), fontSize: 17 * s)
             early.handler = { [weak self] in self?.finishWorkout(early: true) }
-            cv.view.addSubview(shrink); cv.view.addSubview(early)
+            cv.view.addSubview(early)
 
-            cv.view.addSubview(label("M  küçült        Esc  erken bitir", 13 * s, .regular, C_FAINT,
-                                     cv.row(58, 22), tracking: 1.2))
+            cv.view.addSubview(label("M  küçült" + (withMusic ? "        N  sonraki parça" : "") + "        Esc  erken bitir",
+                                     13 * s, .regular, C_FAINT, cv.row(58, 22), tracking: 1.2))
             self.clocks.append(clock); self.fills.append(fill); self.barW.append(bw)
         }
 
@@ -862,10 +926,33 @@ final class Controller {
         }
         let ratio = CGFloat(min(1, elapsed / SESSION_SEC))
         for (i, f) in fills.enumerated() { f.frame.size.width = barW[i] * ratio }
+        updateMove(elapsed)
         if let c = miniClock, c.stringValue != text {
             let attrs = c.attributedStringValue.attributes(at: 0, effectiveRange: nil)
             c.attributedStringValue = NSAttributedString(string: text, attributes: attrs)
         }
+    }
+
+    /// Dakikada bir sıradaki harekete geç
+    func updateMove(_ elapsed: TimeInterval) {
+        guard !moveNames.isEmpty else { return }
+        let i = Int(elapsed / MOVE_SEC)
+        guard i != moveIndex else { return }
+        if moveIndex >= 0 { NSSound(named: "Tink")?.play() }
+        moveIndex = i
+        let cur = MOVES[(moveOffset + i) % MOVES.count]
+        let nxt = MOVES[(moveOffset + i + 1) % MOVES.count]
+        let hasNext = Double(i + 1) * MOVE_SEC < SESSION_SEC
+        func set(_ fields: [NSTextField], _ text: String) {
+            for f in fields {
+                let attrs = f.attributedStringValue.length > 0
+                    ? f.attributedStringValue.attributes(at: 0, effectiveRange: nil) : [:]
+                f.attributedStringValue = NSAttributedString(string: text, attributes: attrs)
+            }
+        }
+        set(moveNames, cur.name)
+        set(moveHows, cur.how)
+        set(moveNexts, hasNext ? "SIRADAKİ:  \(cur.name == nxt.name ? "" : nxt.name.uppercased(with: Locale(identifier: "tr_TR")))" : "SON HAREKET")
     }
 
     // MARK: 2b) Küçültülmüş seans — sayaç sürer, bilgisayar kullanılabilir
@@ -1022,6 +1109,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     let endM = NSPopUpButton(frame: .zero, pullsDown: false)
     let schedule = NSTextField(labelWithString: "")
     let sleepBox = NSButton(checkboxWithTitle: "Uyku uyarıları", target: nil, action: nil)
+    let movesBox = NSButton(checkboxWithTitle: "Hareket önerileri göster", target: nil, action: nil)
+    let volume = NSSlider(value: 80, minValue: 10, maxValue: 100, target: nil, action: nil)
+    let volumeLabel = NSTextField(labelWithString: "")
     let dur = NSPopUpButton(frame: .zero, pullsDown: false)
     let musicBox = NSButton(checkboxWithTitle: "Spor boyunca müzik çal", target: nil, action: nil)
     let musicInfo = NSTextField(labelWithString: "")
@@ -1037,7 +1127,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 
     func show() {
-        let W: CGFloat = 520, H: CGFloat = 530, L: CGFloat = 32, X: CGFloat = 190
+        let W: CGFloat = 520, H: CGFloat = 640, L: CGFloat = 32, X: CGFloat = 190
         win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: W, height: H),
                        styleMask: [.titled, .closable], backing: .buffered, defer: false)
         win.title = "Spor Vakti · Ayarlar"
@@ -1096,8 +1186,16 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         v.addSubview(text("23:30'da \u{201C}Uyku hazırlığı\u{201D}, 23:59'da \u{201C}Uyku vakti\u{201D} ekranı.", 12, .regular,
                           C_MUTED, NSRect(x: L + 20, y: H - 320, width: W - 2 * L - 20, height: 18)))
 
+        // Hareket önerileri
+        movesBox.frame = NSRect(x: L - 2, y: H - 372, width: 300, height: 22)
+        movesBox.font = .systemFont(ofSize: 14, weight: .semibold)
+        movesBox.state = settings.moves ? .on : .off
+        v.addSubview(movesBox)
+        v.addSubview(text("Spor sırasında dakikada bir yeni hareket önerisi.", 12, .regular,
+                          C_MUTED, NSRect(x: L + 20, y: H - 396, width: W - 2 * L - 20, height: 18)))
+
         // Müzik
-        musicBox.frame = NSRect(x: L - 2, y: H - 372, width: 300, height: 22)
+        musicBox.frame = NSRect(x: L - 2, y: H - 448, width: 300, height: 22)
         musicBox.font = .systemFont(ofSize: 14, weight: .semibold)
         musicBox.state = settings.music ? .on : .off
         v.addSubview(musicBox)
@@ -1106,12 +1204,22 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
                                       : "Henüz parça yok. Klasöre mp3 ekle."
         musicInfo.font = .systemFont(ofSize: 12)
         musicInfo.textColor = C_MUTED
-        musicInfo.frame = NSRect(x: L + 20, y: H - 396, width: W - 2 * L - 20, height: 18)
+        musicInfo.frame = NSRect(x: L + 20, y: H - 472, width: W - 2 * L - 20, height: 18)
         v.addSubview(musicInfo)
         let open = NSButton(title: "Müzik klasörünü aç", target: self, action: #selector(openMusic))
         open.bezelStyle = .rounded
-        open.frame = NSRect(x: L + 14, y: H - 432, width: 180, height: 30)
+        open.frame = NSRect(x: L + 14, y: H - 548, width: 180, height: 30)
         v.addSubview(open)
+        v.addSubview(text("Ses", 13, .medium, C_WHITE, NSRect(x: L + 20, y: H - 506, width: 40, height: 18)))
+        volume.frame = NSRect(x: L + 60, y: H - 510, width: 240, height: 24)
+        volume.integerValue = settings.volume
+        volume.target = self; volume.action = #selector(volumeChanged)
+        v.addSubview(volume)
+        volumeLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+        volumeLabel.textColor = C_MUTED
+        volumeLabel.frame = NSRect(x: L + 308, y: H - 506, width: 50, height: 18)
+        v.addSubview(volumeLabel)
+        volumeChanged()
 
         warn.font = .systemFont(ofSize: 12, weight: .medium)
         warn.textColor = C_WARN
@@ -1168,6 +1276,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         saveBtn.isEnabled = msg.isEmpty
     }
 
+    @objc func volumeChanged() { volumeLabel.stringValue = "%\(volume.integerValue)" }
+
     @objc func openMusic() {
         // Hazır parçaların durduğu klasör; buraya eklenenler de çalar ve güncellemede silinmez
         try? FileManager.default.createDirectory(at: APP_MUSIC_DIR, withIntermediateDirectories: true)
@@ -1184,6 +1294,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         s.startMin = startTime
         s.endMin = endTime
         s.sleepNotices = sleepBox.state == .on
+        s.moves = movesBox.state == .on
+        s.volume = volume.integerValue
         do {
             try s.save()
             applySettings(s)

@@ -15,6 +15,7 @@ Sana ne yapacağını söylemez. Ama sana sorar: **gerçekten yapıyor musun, yo
 ### İndirdiğinde elinde neler var
 
 - **Hazır spor müziği.** 10 enstrümantal, enerjik parça (her biri yaklaşık 5 dk, toplam 50 dk) uygulamayla birlikte gelir. Spora başladığın an çalmaya başlar, süre bitince kendiliğinden susar. Ayrıca müzik aramana, hesap açmana, internete gerek yok.
+- **Ne yapacağını bilirsin.** Seans sırasında dakikada bir yeni, ekipmansız hareket önerisi: sandalyeden kalk-otur, masaya dayanarak şınav, duvarda oturma… İstersen ayarlardan kapatırsın.
 - **Kendi ritmin.** Kaç saat kaç dakikada bir spor yapacağını ve her seansın kaç dakika süreceğini ayar ekranından seçersin.
 - **Dürüst bir hesap.** Her seans, her pas, kaçırılan her dakika kayda geçer; `rapor.command` son 7 günü gösterir.
 - **Doğru anda susar.** Görüşmedeyken, ekran paylaşırken ya da bilgisayar başında değilken araya girmez.
@@ -27,7 +28,7 @@ Sana ne yapacağını söylemez. Ama sana sorar: **gerçekten yapıyor musun, yo
 | ![Soru](docs/1-spor-vakti.png) | **Belirlediğin saatlerde ve aralıkla (varsayılan 07:00–23:00, saat başı):** Tam ekran "Spor vakti." Bugünkü durumun altta: seans, dakika, pas. Sağ üstteki **Ayarlar** (ya da `A`) ile saatleri, aralığı, süreyi ve müziği oradan değiştirebilirsin; yeni süre hemen geçerli olur. |
 | | **Şimdi olmuyorsa:** **5 dk ertele** (ya da `E`). Pas sayılmaz; uyarı 5 dk sonra gelir ve o günün düzeni de 5 dk kayar (14:00 ertelendiyse 14:05, sonraki 15:05). Her erteleme 5 dk daha kaydırır; ertesi gün saat başına döner. |
 | ![Emin misin](docs/2-emin-misin.png) | **Pas geçmek istersen:** "Bugün 2. pas olacak. Bugün toplam 20 dakika spordan mahrum kalacaksın." Kutuya **evet** yazınca **Pas geç** düğmesi açılır. **Spora başla** her zaman orada. |
-| ![Seans](docs/3-seans.png) | **Başlıyorum dersen:** Geri sayım başlar (varsayılan 10 dk) ve **spor müziği çalmaya başlar**; süre bitince müzik de yavaşça susar. Erken bitirirsen eksik kalan dakikalar da sayılır. **Küçült · müzik aç** (ya da `M`) ile ekran köşede küçük bir sayaca dönüşür: müzik açabilir, bilgisayarı kullanabilirsin; seans sürer, pas sayılmaz. Süre bitince tam ekran geri gelir. |
+| ![Seans](docs/3-seans.png) | **Başlıyorum dersen:** Geri sayım başlar (varsayılan 10 dk), **spor müziği çalmaya başlar** ve ekranda dakikada bir yeni **hareket önerisi** belirir (sıradaki de yazar). **Sonraki parça** (ya da `N`) ile şarkı değiştirirsin; süre bitince müzik yavaşça susar. Erken bitirirsen eksik kalan dakikalar da sayılır. **Küçült · müzik aç** (ya da `M`) ile ekran köşede küçük bir sayaca dönüşür: müzik açabilir, bilgisayarı kullanabilirsin; seans sürer, pas sayılmaz. Süre bitince tam ekran geri gelir. |
 | ![Tamamlandı](docs/4-tamamlandi.png) | **Bitince:** Bugün kaçıncı seans olduğu ve toplam spor süresi. |
 | ![Uyku hazırlığı](docs/5-uyku-hazirlik.png) | **23:30:** "Uyumak için hazırlıklarını yap." (Uyku uyarıları ayarlardan kapatılabilir.) |
 | ![Uyku vakti](docs/6-uyku-vakti.png) | **23:59:** "Uyku vakti." Gece uyarıları yalnızca **Tamam** ile kapanır. |
@@ -88,7 +89,8 @@ Spor ekranında sağ üstteki **Ayarlar** düğmesine bas (ya da `A`), veya iste
 | **Spor aralığı** | Kaç saat + kaç dakikada bir (5 dk adımlarla, en az 15 dk). Uyarılar başlangıç saatinden itibaren bu aralıkla tekrar eder: 09:00 ve 1 saat 30 dk → 09:00, 10:30, 12:00… Ekran örnek düzeni ve günde kaç uyarı geleceğini gösterir. | 1 saat |
 | **Spor süresi** | 1–60 dakika | 10 dk |
 | **Uyku uyarıları** | 23:30 "Uyku hazırlığı" ve 23:59 "Uyku vakti" ekranları: açık / kapalı | Açık |
-| **Müzik** | Spor boyunca müzik çal: açık / kapalı | Açık |
+| **Hareket önerileri** | Spor sırasında dakikada bir değişen hareket: açık / kapalı | Açık |
+| **Müzik** | Spor boyunca müzik çal: açık / kapalı, ses seviyesi (%10–100) | Açık, %80 |
 
 Kaydettiğin an geçerli olur; yeniden kurman gerekmez.
 
@@ -98,6 +100,8 @@ Repodaki [`muzik/`](muzik) klasöründe spor için hazırlanmış **10 enstrüma
 
 - Spora başlayınca parçalar **karışık sırayla** çalar; her seans farklı bir parçayla açılır.
 - Süre bitince ya da **Erken bitir** dersen ses yavaşça kısılır ve durur.
+- Beğenmediğin parçayı **Sonraki parça** düğmesiyle (ya da `N`) geç.
+- Ses seviyesini ayarlardan seç.
 - **Küçült** ile ekranı köşeye aldığında da müzik çalmaya devam eder.
 - **Kendi müziğini eklemek istersen:** ayar ekranındaki **Müzik klasörünü aç** düğmesi hazır parçaların durduğu klasörü (`~/Applications/SporVakti/muzik`) açar. Oraya mp3 ya da m4a at; parçaların hazır listeye karışır. Güncellemede (`kur.command`) eklediklerin silinmez.
 - Müzik istemiyorsan ayar ekranından kapat.
@@ -121,6 +125,7 @@ It doesn't tell you what to do. It asks: **are you actually doing it, or skippin
 ### What you get out of the box
 
 - **Built-in workout music.** 10 energetic instrumental tracks (about 5 minutes each, 50 minutes in total) ship with the app. They start the moment you start a session and stop on their own when time is up. No streaming service, no account, no internet.
+- **You know what to do.** During the session a new no-equipment move appears every minute: chair squats, desk push-ups, wall sits… Turn it off in settings if you prefer.
 - **Your own rhythm.** Pick how often to move (hours + minutes) and how long each session lasts in the settings window.
 - **An honest tally.** Every session, skip and missed minute is logged; `rapor.command` shows the last 7 days.
 - **Quiet at the right time.** Stays out of the way during calls, screen sharing, or when you're away from the desk.
@@ -131,7 +136,7 @@ It doesn't tell you what to do. It asks: **are you actually doing it, or skippin
 - **On your schedule (default: every hour, 07:00–23:00):** a full-screen "Spor vakti." prompt with today's tally (sessions, minutes, skips). The **Ayarlar** (Settings) button in the top-right corner (or `A`) opens the settings right there (hours, interval, length, music); a new session length applies immediately.
 - **Not now?** **5 dk ertele** (or `E`) snoozes 5 minutes without counting as a skip, and shifts the rest of the day's schedule by 5 minutes too (snooze 14:00 → 14:05, next one at 15:05). Each snooze adds another 5; the next day starts on the hour again.
 - **Skip?** A confirmation screen shows the cost ("This will be skip #2 today, 20 minutes missed"). Typing **evet** ("yes") unlocks the **Pas geç** (Skip) button; **Spora başla** (Start) is always there. Your choice is recorded explicitly.
-- **Start?** A countdown (10 minutes by default) and **the workout music kicks in**; it fades out when time is up. Ending early still counts the missing minutes. **Küçült · müzik aç** (or `M`) shrinks it to a small corner timer so you can put on music or use the computer; the session keeps running and is not a skip. It returns to full screen when time is up.
+- **Start?** A countdown (10 minutes by default), **the workout music kicks in**, and a new **move suggestion** appears every minute (with the next one shown). **Sonraki parça** (Next track, or `N`) skips a song; the music fades out when time is up. Ending early still counts the missing minutes. **Küçült · müzik aç** (or `M`) shrinks it to a small corner timer so you can put on music or use the computer; the session keeps running and is not a skip. It returns to full screen when time is up.
 - **Done:** today's session count and total exercise time.
 - **23:30:** "Get ready for bed." **23:59:** "Bedtime." Night notices close only with **Tamam** (OK), and can be turned off in settings.
 
@@ -180,7 +185,8 @@ Press **Ayarlar** (or `A`) on the workout prompt, or double-click `ayarlar.comma
 | **Interval** (Spor aralığı) | Hours + minutes, 5-minute steps, at least 15 min. Prompts repeat from the start time: 09:00 and 1 h 30 min → 09:00, 10:30, 12:00… The window previews the schedule and how many prompts you'll get per day. | 1 hour |
 | **Session length** (Spor süresi) | 1–60 minutes | 10 min |
 | **Sleep notices** (Uyku uyarıları) | The 23:30 "Get ready for bed" and 23:59 "Bedtime" screens: on / off | On |
-| **Music** (Müzik) | Play music during the session: on / off | On |
+| **Move suggestions** (Hareket önerileri) | A new move every minute during the session: on / off | On |
+| **Music** (Müzik) | Play music during the session: on / off, volume (10–100%) | On, 80% |
 
 Changes apply as soon as you save; no reinstall needed.
 
@@ -190,6 +196,8 @@ The repo's [`muzik/`](muzik) folder holds **10 instrumental workout tracks**. `k
 
 - Tracks play **shuffled** during the session, so each one opens with a different track.
 - When time is up, or you end early, the music fades out and stops.
+- Skip a track with **Sonraki parça** (Next track) or `N`.
+- Set the volume in settings.
 - It keeps playing when you shrink the session to the corner timer.
 - **Want your own tracks?** **Müzik klasörünü aç** (Open music folder) in settings opens the folder holding the built-in tracks (`~/Applications/SporVakti/muzik`). Drop mp3 or m4a files there and they join the shuffle. Updates (`kur.command`) keep the files you added.
 - Don't want music? Turn it off in settings.
