@@ -18,15 +18,24 @@ if [ "$1" != "--deneme" ]; then
 
   HOUR=$((10#$(date +%H))); MIN=$((10#$(date +%M)))
 
-  # Erteleme: her "5 dk ertele" o günün saat başı düzenini 5 dk kaydırır
+  # Spor aralığı (dakika): ayar ekranında seçilir (ayarlar.command). Varsayılan 60 = saat başı.
+  INTERVAL=60
+  if [ -f "$DATA_DIR/ayarlar" ]; then
+    V=$(sed -n 's/^aralik_dk=\([0-9][0-9]*\)$/\1/p' "$DATA_DIR/ayarlar" | tail -1)
+    if [ -n "$V" ] && [ $((10#$V)) -ge 15 ]; then INTERVAL=$((10#$V)); fi
+  fi
+
+  # Erteleme: her "5 dk ertele" o günün düzenini 5 dk kaydırır
   # (14:00 → 14:05 ertelenirse sonraki 15:05'te gelir). Ertesi gün sıfırlanır.
   SHIFT=0
   if [ -f "$DATA_DIR/erteleme" ]; then
     IFS=, read -r SDAY SMIN < "$DATA_DIR/erteleme"
-    if [ "$SDAY" = "$(date +%Y-%m-%d)" ] && [[ "$SMIN" =~ ^[0-9]+$ ]]; then SHIFT=$((SMIN % 60)); fi
+    if [ "$SDAY" = "$(date +%Y-%m-%d)" ] && [[ "$SMIN" =~ ^[0-9]+$ ]]; then SHIFT=$((10#$SMIN % INTERVAL)); fi
   fi
-  # launchd 5 dakikada bir çağırır; yalnızca o saatin spor dakikasındaysak devam et
-  DELTA=$(( (MIN - SHIFT + 60) % 60 ))
+  # Uyarılar 07:00'den başlayıp INTERVAL dakikada bir gelir.
+  # launchd 5 dakikada bir çağırır; yalnızca spor dakikasındaysak devam et.
+  ELAPSED=$(( HOUR * 60 + MIN - 7 * 60 - SHIFT ))
+  DELTA=$(( (ELAPSED % INTERVAL + INTERVAL) % INTERVAL ))
 
   if [ "$HOUR" -eq 23 ] && [ "$MIN" -ge 30 ] && [ "$MIN" -lt 35 ]; then
     ARGS=(uyku-hazirlik)
