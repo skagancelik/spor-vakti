@@ -18,6 +18,10 @@ let notice = args.compactMap(Notice.init(rawValue:)).first
 
 /// Ayar ekranı:  spor-vakti ayarlar
 let isSettings = args.first == "ayarlar"
+/// Menü çubuğu simgesi:  spor-vakti menu  (girişte LaunchAgent başlatır)
+let isMenu = args.first == "menu"
+/// Menüden "Şimdi spor yap": saat beklemeden spor ekranı (kayıt tutulur)
+let isNow = args.first == "simdi"
 
 /// Verilerin durduğu klasör (geçmiş, erteleme, ayarlar, kişisel müzik)
 let DATA_DIR: URL = {
@@ -179,6 +183,60 @@ final class Journal {
 
 let journal = Journal()
 
+extension Journal {
+    /// Arka arkaya en az bir seans yapılan gün sayısı. Bugün henüz seans yoksa dünden geriye sayar.
+    func streak() -> Int {
+        let days = Set(all().filter { !$0.outcome.isPass && $0.doneMin > 0 }.map { $0.day })
+        let cal = Calendar.current
+        var d = Date(), n = 0
+        if !days.contains(Journal.dayFmt.string(from: d)) { d = cal.date(byAdding: .day, value: -1, to: d)! }
+        while days.contains(Journal.dayFmt.string(from: d)) {
+            n += 1
+            d = cal.date(byAdding: .day, value: -1, to: d)!
+        }
+        return n
+    }
+}
+
+// MARK: - Duraklatma ve sonraki uyarı (run.sh ile aynı kurallar)
+
+let PAUSE_FILE = DATA_DIR.appendingPathComponent("DURAKLAT")
+let PAUSE_UNTIL_FILE = DATA_DIR.appendingPathComponent("duraklat_bitis")
+
+/// Duraklatılmış mı; süreliyse ne zamana kadar
+func pauseState() -> (paused: Bool, until: Date?) {
+    if FileManager.default.fileExists(atPath: PAUSE_FILE.path) { return (true, nil) }
+    if let t = try? String(contentsOf: PAUSE_UNTIL_FILE, encoding: .utf8),
+       let e = TimeInterval(t.trimmingCharacters(in: .whitespacesAndNewlines)), e > Date().timeIntervalSince1970 {
+        return (true, Date(timeIntervalSince1970: e))
+    }
+    return (false, nil)
+}
+
+func pause(until date: Date) {
+    try? "\(Int(date.timeIntervalSince1970))\n".write(to: PAUSE_UNTIL_FILE, atomically: true, encoding: .utf8)
+}
+
+func resume() {
+    try? FileManager.default.removeItem(at: PAUSE_FILE)
+    try? FileManager.default.removeItem(at: PAUSE_UNTIL_FILE)
+}
+
+/// Şu andan sonraki ilk spor uyarısı. Bugün kalmadıysa yarının ilk uyarısı.
+func nextPrompt(from now: Date = Date(), s: Settings = settings) -> Date {
+    let cal = Calendar.current
+    let today = cal.startOfDay(for: now)
+    let nowMin = now.timeIntervalSince(today) / 60
+    let shift = journal.todayShift()
+    var t = s.startMin + shift
+    while t <= s.endMin {
+        let sleepClash = s.sleepNotices && t >= 23 * 60 + 30
+        if Double(t) >= nowMin - 0.99 && !sleepClash { return today.addingTimeInterval(Double(t) * 60) }
+        t += s.intervalMin
+    }
+    return cal.date(byAdding: .day, value: 1, to: today)!.addingTimeInterval(Double(s.startMin) * 60)
+}
+
 // MARK: - Terminal raporu:  spor-vakti rapor
 
 if args.first == "rapor" {
@@ -254,7 +312,7 @@ if args.first == "paylasim-kontrol" {
     exit(0)
 }
 
-if !isTrial && !isSettings {
+if !isTrial && !isSettings && !isMenu && !isNow {
     if let app = microphoneUser() { print("atlandı: mikrofon kullanımda (\(app))"); exit(0) }
     if sharingWindowVisible() { print("atlandı: ekran paylaşılıyor"); exit(0) }
 }
@@ -933,11 +991,13 @@ final class Controller {
         let t = todayStats()
         let n = max(1, t.sessions)
         let missed = t.missedMin > 0 ? " · \(t.missedMin) dk kaçırıldı" : ""
+        let streak = journal.streak()
+        let streakText = streak >= 2 ? " · \(streak) gündür her gün spor" : ""
         summary(kicker: "TAMAMLANDI", kickerColor: C_ACCENT,
                 title: "Bugün \(n). seans.",
                 line: "Bugün toplam \(max(t.sportMin, SESSION_MIN)) dakika spor yaptın.",
                 lineColor: C_ACCENT,
-                footer: "\(t.passes) pas\(missed)")
+                footer: "\(t.passes) pas\(missed)\(streakText)")
     }
 
     func quit() {
@@ -1138,7 +1198,254 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) { onClose() }
 }
 
+// MARK: - Haftalık rapor penceresi
+
+final class BarChart: NSView {
+    struct Day { let label: String; let sport: Int; let missed: Int; let isToday: Bool }
+    var days: [Day] = []
+
+    override func draw(_ dirtyRect: NSRect) {
+        let top = max(10, days.map { $0.sport + $0.missed }.max() ?? 10)
+        let slot = bounds.width / CGFloat(max(1, days.count))
+        let barW = min(44, slot * 0.55)
+        let base: CGFloat = 26, chartH = bounds.height - base - 24
+        let font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        func put(_ str: String, _ color: NSColor, _ cx: CGFloat, _ y: CGFloat, bold: Bool = false) {
+            let a: [NSAttributedString.Key: Any] = [.font: bold ? NSFont.systemFont(ofSize: 11, weight: .bold) : font,
+                                                    .foregroundColor: color]
+            let sz = (str as NSString).size(withAttributes: a)
+            (str as NSString).draw(at: NSPoint(x: cx - sz.width / 2, y: y), withAttributes: a)
+        }
+        for (i, d) in days.enumerated() {
+            let cx = slot * (CGFloat(i) + 0.5)
+            let hS = chartH * CGFloat(d.sport) / CGFloat(top)
+            let hM = chartH * CGFloat(d.missed) / CGFloat(top)
+            if d.sport > 0 {
+                C_ACCENT.setFill()
+                NSBezierPath(roundedRect: NSRect(x: cx - barW / 2, y: base, width: barW, height: hS), xRadius: 4, yRadius: 4).fill()
+            }
+            if d.missed > 0 {
+                C_WARN.withAlphaComponent(0.55).setFill()
+                NSBezierPath(roundedRect: NSRect(x: cx - barW / 2, y: base + hS + (d.sport > 0 ? 2 : 0), width: barW, height: hM),
+                             xRadius: 4, yRadius: 4).fill()
+            }
+            if d.sport + d.missed == 0 {
+                NSColor(white: 1, alpha: 0.08).setFill()
+                NSBezierPath(roundedRect: NSRect(x: cx - barW / 2, y: base, width: barW, height: 3), xRadius: 1.5, yRadius: 1.5).fill()
+            }
+            if d.sport > 0 { put("\(d.sport)", C_WHITE, cx, base + hS + hM + 6) }
+            else if d.missed > 0 { put("\(d.missed)", C_WARN, cx, base + hS + hM + 6) }
+            put(d.label, d.isToday ? C_WHITE : C_MUTED, cx, 4, bold: d.isToday)
+        }
+    }
+}
+
+final class ReportWindow: NSObject, NSWindowDelegate {
+    var win: NSWindow!
+    let onClose: () -> Void
+    init(onClose: @escaping () -> Void) { self.onClose = onClose }
+
+    func show() {
+        let W: CGFloat = 600, H: CGFloat = 420, L: CGFloat = 32
+        win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: W, height: H),
+                       styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        win.title = "Spor Vakti · Haftalık rapor"
+        win.appearance = NSAppearance(named: .darkAqua)
+        win.backgroundColor = C_BG1
+        win.isReleasedWhenClosed = false
+        win.delegate = self
+        let v = win.contentView!
+
+        let all = journal.all()
+        let cal = Calendar.current
+        let dayName = DateFormatter()
+        dayName.locale = Locale(identifier: "tr_TR")
+        dayName.dateFormat = "EEE"
+        var days: [BarChart.Day] = []
+        var total = DayStats([])
+        for back in (0..<7).reversed() {
+            let date = cal.date(byAdding: .day, value: -back, to: Date())!
+            let key = Journal.dayFmt.string(from: date)
+            let st = DayStats(all.filter { $0.day == key })
+            total.sessions += st.sessions; total.sportMin += st.sportMin
+            total.passes += st.passes; total.missedMin += st.missedMin
+            days.append(.init(label: back == 0 ? "Bugün" : dayName.string(from: date),
+                              sport: st.sportMin, missed: st.missedMin, isToday: back == 0))
+        }
+
+        func t(_ str: String, _ size: CGFloat, _ w: NSFont.Weight, _ c: NSColor, _ f: NSRect) {
+            let l = NSTextField(labelWithString: str)
+            l.font = .systemFont(ofSize: size, weight: w); l.textColor = c; l.frame = f
+            v.addSubview(l)
+        }
+        t("Son 7 gün", 24, .bold, C_WHITE, NSRect(x: L, y: H - 62, width: 300, height: 32))
+        let streak = journal.streak()
+        t(streak > 0 ? "\(streak) gündür her gün spor yapıyorsun." : "Bugün bir seansla yeni bir seri başlat.",
+          13, .medium, streak > 0 ? C_ACCENT : C_MUTED, NSRect(x: L, y: H - 88, width: W - 2 * L, height: 18))
+
+        // Toplamlar
+        let cols: [(String, String, NSColor)] = [
+            ("\(total.sessions)", "seans", C_WHITE), ("\(total.sportMin) dk", "spor", C_ACCENT),
+            ("\(total.passes)", "pas", C_WARN), ("\(total.missedMin) dk", "kaçırılan", C_WARN)]
+        let cw = (W - 2 * L) / CGFloat(cols.count)
+        for (i, c) in cols.enumerated() {
+            t(c.0, 22, .bold, c.2, NSRect(x: L + cw * CGFloat(i), y: H - 136, width: cw, height: 28))
+            t(c.1, 12, .regular, C_MUTED, NSRect(x: L + cw * CGFloat(i), y: H - 154, width: cw, height: 16))
+        }
+
+        let chart = BarChart(frame: NSRect(x: L, y: 48, width: W - 2 * L, height: H - 220))
+        chart.days = days
+        v.addSubview(chart)
+        let legend = NSTextField(labelWithAttributedString: {
+            let m = NSMutableAttributedString()
+            let f = NSFont.systemFont(ofSize: 11)
+            m.append(NSAttributedString(string: "■ ", attributes: [.foregroundColor: C_ACCENT, .font: f]))
+            m.append(NSAttributedString(string: "spor dakikası     ", attributes: [.foregroundColor: C_MUTED, .font: f]))
+            m.append(NSAttributedString(string: "■ ", attributes: [.foregroundColor: C_WARN, .font: f]))
+            m.append(NSAttributedString(string: "kaçırılan dakika", attributes: [.foregroundColor: C_MUTED, .font: f]))
+            return m
+        }())
+        legend.frame = NSRect(x: L, y: 18, width: W - 2 * L, height: 16)
+        v.addSubview(legend)
+
+        win.center()
+        win.makeKeyAndOrderFront(nil)
+        win.orderFrontRegardless()
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func windowWillClose(_ notification: Notification) { onClose() }
+}
+
+// MARK: - Menü çubuğu:  spor-vakti menu
+
+final class MenuBar: NSObject, NSMenuDelegate {
+    let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    var settingsWin: SettingsWindow?
+    var reportWin: ReportWindow?
+    let binary = (Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0])).resolvingSymlinksInPath()
+
+    func start() {
+        if let img = NSImage(systemSymbolName: "figure.run", accessibilityDescription: "Spor Vakti") {
+            img.isTemplate = true
+            item.button?.image = img
+            item.button?.imagePosition = .imageLeading
+        }
+        let menu = NSMenu()
+        menu.delegate = self
+        menu.autoenablesItems = false
+        item.menu = menu
+        refresh()
+        let t = Timer(timeInterval: 20, repeats: true) { [weak self] _ in self?.refresh() }
+        RunLoop.main.add(t, forMode: .common)
+    }
+
+    static let hm = Journal.fmt("HH:mm")
+
+    /// Simgenin yanındaki yazı: sonraki uyarı saati ya da duraklatma
+    func refresh() {
+        settings = Settings.load()
+        let p = pauseState()
+        let title: String
+        if p.paused { title = " ⏸" } else { title = " " + MenuBar.hm.string(from: nextPrompt()) }
+        item.button?.title = title
+    }
+
+    func add(_ menu: NSMenu, _ title: String, _ action: Selector? = nil, enabled: Bool = true) {
+        let mi = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        mi.target = self
+        mi.isEnabled = enabled && action != nil
+        menu.addItem(mi)
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        refresh()
+        menu.removeAllItems()
+        let p = pauseState()
+        if p.paused {
+            add(menu, p.until.map { "Duraklatıldı · \(MenuBar.hm.string(from: $0))'e kadar" } ?? "Duraklatıldı")
+        } else {
+            let next = nextPrompt()
+            let mins = Int(ceil(next.timeIntervalSinceNow / 60))
+            let when = Calendar.current.isDateInToday(next)
+                ? (mins <= 0 ? "şimdi" : mins < 60 ? "\(mins) dk sonra" : "\(mins / 60) sa \(mins % 60) dk sonra")
+                : "yarın"
+            add(menu, "Sonraki spor: \(MenuBar.hm.string(from: next)) · \(when)")
+        }
+        let t = DayStats(journal.today())
+        add(menu, "Bugün: \(t.sessions) seans · \(t.sportMin) dk spor · \(t.passes) pas")
+        let streak = journal.streak()
+        if streak >= 1 { add(menu, "Seri: \(streak) gündür her gün spor") }
+        menu.addItem(.separator())
+        add(menu, "Şimdi spor yap", #selector(startNow))
+        if p.paused {
+            add(menu, "Devam et", #selector(doResume))
+        } else {
+            add(menu, "1 saat duraklat", #selector(pauseHour))
+            add(menu, "Bugünlük duraklat", #selector(pauseToday))
+        }
+        menu.addItem(.separator())
+        add(menu, "Ayarlar…", #selector(openSettings))
+        add(menu, "Haftalık rapor…", #selector(openReport))
+        menu.addItem(.separator())
+        add(menu, "Menü çubuğundan kaldır", #selector(quitMenu))
+    }
+
+    /// Spor/uyku ekranı şu an açık mı (bu menü ve ayar pencereleri hariç)
+    func promptOpen() -> Bool {
+        let ps = Process()
+        ps.executableURL = URL(fileURLWithPath: "/bin/ps")
+        ps.arguments = ["-axo", "args="]
+        let pipe = Pipe(); ps.standardOutput = pipe
+        try? ps.run(); ps.waitUntilExit()
+        let out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        return out.split(separator: "\n").contains { line in
+            line.hasPrefix(binary.path) && !line.hasSuffix(" menu") && !line.hasSuffix(" ayarlar")
+        }
+    }
+
+    @objc func startNow() {
+        guard !promptOpen() else { return }
+        let p = Process()
+        p.executableURL = binary
+        p.arguments = ["simdi"]
+        try? p.run()
+    }
+
+    @objc func pauseHour() { pause(until: Date().addingTimeInterval(3600)); refresh() }
+    @objc func pauseToday() {
+        pause(until: Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date()))!)
+        refresh()
+    }
+    @objc func doResume() { resume(); refresh() }
+
+    @objc func openSettings() {
+        if let w = settingsWin { w.win.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return }
+        settings = Settings.load()
+        let w = SettingsWindow { [weak self] in
+            DispatchQueue.main.async { self?.settingsWin = nil; self?.refresh() }
+        }
+        settingsWin = w
+        w.show()
+    }
+
+    @objc func openReport() {
+        if let w = reportWin { w.win.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return }
+        let w = ReportWindow { [weak self] in DispatchQueue.main.async { self?.reportWin = nil } }
+        reportWin = w
+        w.show()
+    }
+
+    @objc func quitMenu() { NSApp.terminate(nil) }
+}
+
 let app = NSApplication.shared
+if isMenu {
+    app.setActivationPolicy(.accessory)
+    let bar = MenuBar()
+    bar.start()
+    app.run()
+}
 if isSettings {
     app.setActivationPolicy(.regular)
     let standalone = SettingsWindow { exit(0) }

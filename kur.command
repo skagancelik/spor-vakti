@@ -53,5 +53,29 @@ PL
 
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
+
+echo "-- menü çubuğu simgesi"
+MLABEL="com.sporvakti.menu"
+MPLIST="$HOME/Library/LaunchAgents/$MLABEL.plist"
+cat > "$MPLIST" <<PL
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$MLABEL</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$APP_DIR/spor-vakti</string>
+    <string>menu</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>LimitLoadToSessionType</key><string>Aqua</string>
+  <key>ProcessType</key><string>Interactive</string>
+</dict>
+</plist>
+PL
+launchctl bootout "gui/$(id -u)/$MLABEL" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$MPLIST"
 echo "✅ Kuruldu. Spor uyarıları ayarladığın saatlerde gelir (varsayılan 07:00–23:00, saat başı), uyku uyarıları 23:30 ve 23:59'da."
-echo "   Aralık, süre ve müzik için: ayarlar.command   ·   Denemek için: deneme.command"
+echo "   Menü çubuğundaki koşan adam simgesi: sonraki spor, duraklat, ayarlar, rapor."
+echo "   Denemek için: deneme.command"
