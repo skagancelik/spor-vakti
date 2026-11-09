@@ -62,12 +62,18 @@ struct Settings {
     }
 }
 
-let settings = Settings.load()
+var settings = Settings.load()
 
 /// Bir seansın süresi (dakika). Ayar ekranından seçilir; SPOR_VAKTI_DK ortam değişkeni hepsinin önüne geçer.
-let SESSION_MIN: Int = max(1, Int(env["SPOR_VAKTI_DK"] ?? "") ?? settings.sessionMin)
+var SESSION_MIN: Int = max(1, Int(env["SPOR_VAKTI_DK"] ?? "") ?? settings.sessionMin)
 /// Deneme modunda seans 20 saniye sürer ve kayıt tutulmaz.
-let SESSION_SEC: Double = isTrial ? 20 : Double(SESSION_MIN * 60)
+var SESSION_SEC: Double { isTrial ? 20 : Double(SESSION_MIN * 60) }
+
+/// Kaydedilen ayarları bu çalışmaya da uygular (spor ekranından açılan ayarlar için)
+func applySettings(_ s: Settings) {
+    settings = s
+    if env["SPOR_VAKTI_DK"] == nil { SESSION_MIN = s.sessionMin }
+}
 /// Bu süre içinde cevap verilmezse seans "cevapsız" (pas) sayılır.
 let ANSWER_TIMEOUT: TimeInterval = isTrial ? 60 : 5 * 60
 /// "Ertele" bu kadar dakika kaydırır; sonraki saat başı uyarılar da aynı kadar kayar.
@@ -246,8 +252,9 @@ if !isTrial && !isSettings {
 
 // MARK: - Müzik
 // Seans başlayınca muzik klasörlerindeki parçalar karışık sırayla çalar, seans bitince durur.
-// 1) Uygulamanın yanındaki "muzik" klasörü (repodaki muzik/, kur.command kopyalar)
-// 2) DATA_DIR/muzik: kişisel parçalar (güncellemede silinmez)
+// 1) Uygulamanın yanındaki "muzik" klasörü: repodaki 10 parça + kullanıcının eklediği parçalar.
+//    kur.command repodakileri kopyalar, kullanıcının eklediklerini silmez.
+// 2) DATA_DIR/muzik: eski sürümlerden kalan kişisel klasör (hâlâ taranır)
 
 let MUSIC_EXT: Set<String> = ["mp3", "m4a", "aac", "wav", "aiff", "aif"]
 let APP_MUSIC_DIR: URL = (Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0]))
@@ -412,7 +419,7 @@ struct Canvas {
 // MARK: - Akış: soru → seans → özet
 
 final class Controller {
-    enum Phase { case prompt, confirm, workout, summary, notice }
+    enum Phase { case prompt, confirm, settings, workout, summary, notice }
 
     var phase = Phase.prompt
     var roots: [NSView] = []
@@ -428,6 +435,8 @@ final class Controller {
     /// Küçültülmüş seansta köşede duran küçük sayaç (müzik açmak vb. için bilgisayar kullanılabilir)
     var mini: NSPanel?
     var miniClock: NSTextField?
+    /// Spor ekranından açılan ayar penceresi
+    var settingsWindow: SettingsWindow?
     var start = Date()
     let triggeredAt = Date()
     let music = MusicPlayer()
@@ -463,6 +472,8 @@ final class Controller {
 
         NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] ev in
             guard let self = self else { return ev }
+            // Ayar penceresi açıkken tuşlar ona gitsin
+            if self.phase == .settings { return ev }
             // Onay ekranında yazı kutusu tuşları alabilsin; yalnızca Esc'i yakala
             if self.phase == .confirm && ev.keyCode != 53 { return ev }
             self.key(ev.keyCode); return nil
@@ -495,7 +506,9 @@ final class Controller {
     func key(_ code: UInt16) {
         let enter = code == 36 || code == 76, esc = code == 53
         switch phase {
-        case .prompt:  if enter { startWorkout() } else if esc { askToSkip() } else if code == 14 { snooze() }  // E
+        case .prompt:  if enter { startWorkout() } else if esc { askToSkip() }
+                       else if code == 14 { snooze() } else if code == 0 { openSettings() }  // E, A
+        case .settings: break
         case .confirm: if esc { showPrompt(first: false) }
         case .workout: if esc { finishWorkout(early: true) } else if code == 46 { minimize() }  // M
         case .summary: quit()
@@ -569,17 +582,57 @@ final class Controller {
             later.handler = { [weak self] in self?.snooze() }
             cv.view.addSubview(later)
 
-            cv.view.addSubview(label("Enter  başla        E  ertele        Esc  pas geç", 13 * s, .regular, C_FAINT,
-                                     cv.row(58, 22), tracking: 1.2))
+            // Sağ üst köşede, göze batmayan ayar düğmesi
+            let aw = 132 * s, ah = 40 * s, m = 28 * s
+            let gear = ActionButton("Ayarlar", primary: false,
+                                    frame: NSRect(x: cv.w - aw - m, y: cv.h - ah - m - 24, width: aw, height: ah),
+                                    fontSize: 15 * s)
+            gear.handler = { [weak self] in self?.openSettings() }
+            cv.view.addSubview(gear)
+
+            cv.view.addSubview(label("Enter  başla        E  ertele        A  ayarlar        Esc  pas geç", 13 * s, .regular,
+                                     C_FAINT, cv.row(58, 22), tracking: 1.2))
         }
         guard first else { return }
         NSSound(named: "Hero")?.play()
+        startDeadline()
+    }
 
+    /// Bu süre içinde cevap verilmezse seans "cevapsız" sayılır.
+    func startDeadline() {
+        deadline?.invalidate()
         deadline = Timer.scheduledTimer(withTimeInterval: ANSWER_TIMEOUT, repeats: false) { [weak self] _ in
             guard let self = self, self.phase == .prompt || self.phase == .confirm else { return }
             journal.append(.noAnswer, planned: SESSION_MIN, done: 0, at: self.triggeredAt)
             self.quit()
         }
+    }
+
+    // MARK: 1a) Ayarlar — spor ekranından açılır, kapanınca soruya dönülür
+
+    func openSettings() {
+        guard phase == .prompt, settingsWindow == nil else { return }
+        phase = .settings
+        // Ayar penceresindeki açılır menüler tam ekranın arkasında kalmasın diye tam ekranı gizle.
+        // Ayarlarla uğraşırken süre işlemez; pencere kapanınca 5 dakika yeniden başlar.
+        deadline?.invalidate()
+        windows.forEach { $0.orderOut(nil) }
+        let sw = SettingsWindow { [weak self] in self?.closeSettings() }
+        settingsWindow = sw
+        sw.show()
+        sw.win.level = .floating
+    }
+
+    func closeSettings() {
+        guard phase == .settings else { return }
+        // Pencere kapanma çağrısının içindeyiz; nesneyi bir sonraki turda bırak
+        DispatchQueue.main.async { [weak self] in self?.settingsWindow = nil }
+        for (i, win) in windows.enumerated() {
+            if i == 0 { win.makeKeyAndOrderFront(nil) } else { win.orderFrontRegardless() }
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        showPrompt(first: false)  // yeni süre düğmeye yansısın
+        startDeadline()
     }
 
     // MARK: 1b) Pas onayı — "evet" yazılmadan pas geçilmez
@@ -889,6 +942,9 @@ final class Controller {
 
 final class SettingsWindow: NSObject, NSWindowDelegate {
     var win: NSWindow!
+    /// Pencere kapanınca (Kaydet, Vazgeç ya da kırmızı düğme)
+    let onClose: () -> Void
+    init(onClose: @escaping () -> Void) { self.onClose = onClose }
     let hours = NSPopUpButton(frame: .zero, pullsDown: false)
     let mins = NSPopUpButton(frame: .zero, pullsDown: false)
     let dur = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -996,9 +1052,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 
     @objc func openMusic() {
-        // Kişisel klasör: güncellemede (kur.command) silinmez
-        try? FileManager.default.createDirectory(at: USER_MUSIC_DIR, withIntermediateDirectories: true)
-        NSWorkspace.shared.open(USER_MUSIC_DIR)
+        // Hazır parçaların durduğu klasör; buraya eklenenler de çalar ve güncellemede silinmez
+        try? FileManager.default.createDirectory(at: APP_MUSIC_DIR, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(APP_MUSIC_DIR)
     }
 
     @objc func save() {
@@ -1010,6 +1066,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         s.music = musicBox.state == .on
         do {
             try s.save()
+            applySettings(s)
             print("ayarlar kaydedildi: aralık \(s.intervalMin) dk, süre \(s.sessionMin) dk, müzik \(s.music ? "açık" : "kapalı")")
             close()
         } catch {
@@ -1018,14 +1075,14 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 
     @objc func close() { win.close() }
-    func windowWillClose(_ notification: Notification) { exit(0) }
+    func windowWillClose(_ notification: Notification) { onClose() }
 }
 
 let app = NSApplication.shared
 if isSettings {
     app.setActivationPolicy(.regular)
-    let settingsWindow = SettingsWindow()
-    settingsWindow.show()
+    let standalone = SettingsWindow { exit(0) }
+    standalone.show()
     app.run()
 }
 app.setActivationPolicy(.accessory)

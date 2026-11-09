@@ -12,9 +12,9 @@ mkdir -p "$APP_DIR" "$HOME/Library/LaunchAgents"
 echo "-- derleniyor"
 /usr/bin/swiftc -O -o "$APP_DIR/spor-vakti" "$SRC/src/main.swift"
 cp "$SRC/scripts/run.sh" "$APP_DIR/run.sh"
-# Spor sırasında çalan müzikler (repodaki muzik/ klasörü)
-rm -rf "$APP_DIR/muzik"
-cp -R "$SRC/muzik" "$APP_DIR/muzik" 2>/dev/null || mkdir -p "$APP_DIR/muzik"
+# Spor sırasında çalan müzikler: repodaki parçaları kopyala, kullanıcının eklediklerine dokunma
+mkdir -p "$APP_DIR/muzik"
+cp "$SRC"/muzik/* "$APP_DIR/muzik/" 2>/dev/null || true
 chmod +x "$APP_DIR/spor-vakti" "$APP_DIR/run.sh"
 
 echo "-- LaunchAgent yazılıyor"

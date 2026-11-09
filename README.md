@@ -23,7 +23,7 @@ Sana ne yapacağını söylemez. Ama sana sorar: **gerçekten yapıyor musun, yo
 
 | | |
 |---|---|
-| ![Soru](docs/1-spor-vakti.png) | **Belirlediğin aralıkla (varsayılan saat başı, 07:00–23:00):** Tam ekran "Spor vakti." Bugünkü durumun altta: seans, dakika, pas. |
+| ![Soru](docs/1-spor-vakti.png) | **Belirlediğin aralıkla (varsayılan saat başı, 07:00–23:00):** Tam ekran "Spor vakti." Bugünkü durumun altta: seans, dakika, pas. Sağ üstteki **Ayarlar** (ya da `A`) ile aralığı, süreyi ve müziği oradan değiştirebilirsin; yeni süre hemen geçerli olur. |
 | | **Şimdi olmuyorsa:** **5 dk ertele** (ya da `E`). Pas sayılmaz; uyarı 5 dk sonra gelir ve o günün düzeni de 5 dk kayar (14:00 ertelendiyse 14:05, sonraki 15:05). Her erteleme 5 dk daha kaydırır; ertesi gün saat başına döner. |
 | ![Emin misin](docs/2-emin-misin.png) | **Pas geçmek istersen:** "Bugün 2. pas olacak. Bugün toplam 20 dakika spordan mahrum kalacaksın." Kutuya **evet** yazınca **Pas geç** düğmesi açılır. **Spora başla** her zaman orada. |
 | ![Seans](docs/3-seans.png) | **Başlıyorum dersen:** Geri sayım başlar (varsayılan 10 dk) ve **spor müziği çalmaya başlar**; süre bitince müzik de yavaşça susar. Erken bitirirsen eksik kalan dakikalar da sayılır. **Küçült · müzik aç** (ya da `M`) ile ekran köşede küçük bir sayaca dönüşür: müzik açabilir, bilgisayarı kullanabilirsin; seans sürer, pas sayılmaz. Süre bitince tam ekran geri gelir. |
@@ -67,7 +67,7 @@ Ya da Finder'da dosyalara çift tıkla:
 
 ![Ayarlar](docs/7-ayarlar.png)
 
-`ayarlar.command` dosyasına çift tıkla:
+Spor ekranında sağ üstteki **Ayarlar** düğmesine bas (ya da `A`), veya istediğin zaman `ayarlar.command` dosyasına çift tıkla:
 
 | Ayar | Seçenekler | Varsayılan |
 |---|---|---|
@@ -84,7 +84,7 @@ Repodaki [`muzik/`](muzik) klasöründe spor için hazırlanmış **10 enstrüma
 - Spora başlayınca parçalar **karışık sırayla** çalar; her seans farklı bir parçayla açılır.
 - Süre bitince ya da **Erken bitir** dersen ses yavaşça kısılır ve durur.
 - **Küçült** ile ekranı köşeye aldığında da müzik çalmaya devam eder.
-- **Kendi müziğini eklemek istersen:** ayar ekranındaki **Müzik klasörünü aç** düğmesiyle açılan klasöre (`~/Library/Application Support/SporVakti/muzik`) mp3 ya da m4a at. Bu klasör güncellemelerde silinmez; parçaların hazır listeye karışır.
+- **Kendi müziğini eklemek istersen:** ayar ekranındaki **Müzik klasörünü aç** düğmesi hazır parçaların durduğu klasörü (`~/Applications/SporVakti/muzik`) açar. Oraya mp3 ya da m4a at; parçaların hazır listeye karışır. Güncellemede (`kur.command`) eklediklerin silinmez.
 - Müzik istemiyorsan ayar ekranından kapat.
 
 Ayarlar `~/Library/Application Support/SporVakti/ayarlar` dosyasında durur. `SPOR_VAKTI_DK` ortam değişkeni seans süresinin önüne geçer.
@@ -112,7 +112,7 @@ It doesn't tell you what to do. It asks: **are you actually doing it, or skippin
 
 ### How it works
 
-- **On your schedule (default: every hour, 07:00–23:00):** a full-screen "Spor vakti." prompt with today's tally (sessions, minutes, skips).
+- **On your schedule (default: every hour, 07:00–23:00):** a full-screen "Spor vakti." prompt with today's tally (sessions, minutes, skips). The **Ayarlar** (Settings) button in the top-right corner (or `A`) opens the settings right there; a new session length applies immediately.
 - **Not now?** **5 dk ertele** (or `E`) snoozes 5 minutes without counting as a skip, and shifts the rest of the day's schedule by 5 minutes too (snooze 14:00 → 14:05, next one at 15:05). Each snooze adds another 5; the next day starts on the hour again.
 - **Skip?** A confirmation screen shows the cost ("This will be skip #2 today, 20 minutes missed"). Typing **evet** ("yes") unlocks the **Pas geç** (Skip) button; **Spora başla** (Start) is always there. Your choice is recorded explicitly.
 - **Start?** A countdown (10 minutes by default) and **the workout music kicks in**; it fades out when time is up. Ending early still counts the missing minutes. **Küçült · müzik aç** (or `M`) shrinks it to a small corner timer so you can put on music or use the computer; the session keeps running and is not a skip. It returns to full screen when time is up.
@@ -144,7 +144,7 @@ The `.command` scripts can also be double-clicked in Finder: `kur` (install/upda
 
 ![Settings](docs/7-ayarlar.png)
 
-Double-click `ayarlar.command`:
+Press **Ayarlar** (or `A`) on the workout prompt, or double-click `ayarlar.command` anytime:
 
 | Setting | Options | Default |
 |---|---|---|
@@ -161,7 +161,7 @@ The repo's [`muzik/`](muzik) folder holds **10 instrumental workout tracks**. `k
 - Tracks play **shuffled** during the session, so each one opens with a different track.
 - When time is up, or you end early, the music fades out and stops.
 - It keeps playing when you shrink the session to the corner timer.
-- **Want your own tracks?** Use **Müzik klasörünü aç** (Open music folder) in settings and drop mp3 or m4a files into `~/Library/Application Support/SporVakti/muzik`. That folder survives updates; your tracks join the shuffle.
+- **Want your own tracks?** **Müzik klasörünü aç** (Open music folder) in settings opens the folder holding the built-in tracks (`~/Applications/SporVakti/muzik`). Drop mp3 or m4a files there and they join the shuffle. Updates (`kur.command`) keep the files you added.
 - Don't want music? Turn it off in settings.
 
 ### Privacy
