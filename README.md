@@ -18,6 +18,7 @@ Sana ne yapacağını söylemez. Ama sana sorar: **gerçekten yapıyor musun, yo
 - **Kendi ritmin.** Kaç saat kaç dakikada bir spor yapacağını ve her seansın kaç dakika süreceğini ayar ekranından seçersin.
 - **Dürüst bir hesap.** Her seans, her pas, kaçırılan her dakika kayda geçer; `rapor.command` son 7 günü gösterir.
 - **Doğru anda susar.** Görüşmedeyken, ekran paylaşırken ya da bilgisayar başında değilken araya girmez.
+- **Menü çubuğunda.** Sonraki sporun saati hep gözünün önünde; tek tıkla duraklat, ayarla ya da haftalık raporuna bak.
 
 ### Nasıl çalışır
 
@@ -30,6 +31,18 @@ Sana ne yapacağını söylemez. Ama sana sorar: **gerçekten yapıyor musun, yo
 | ![Tamamlandı](docs/4-tamamlandi.png) | **Bitince:** Bugün kaçıncı seans olduğu ve toplam spor süresi. |
 | ![Uyku hazırlığı](docs/5-uyku-hazirlik.png) | **23:30:** "Uyumak için hazırlıklarını yap." (Uyku uyarıları ayarlardan kapatılabilir.) |
 | ![Uyku vakti](docs/6-uyku-vakti.png) | **23:59:** "Uyku vakti." Gece uyarıları yalnızca **Tamam** ile kapanır. |
+
+### Menü çubuğu
+
+Kurulumdan sonra menü çubuğunda koşan adam simgesi ve sonraki sporun saati görünür (duraklatılmışsa ⏸). Tıklayınca:
+
+- Sonraki spor ne zaman, bugün kaç seans ve kaç dakika yaptın, kaç gündür her gün spor yapıyorsun (seri)
+- **Şimdi spor yap**: saati beklemeden başla
+- **1 saat duraklat** / **Bugünlük duraklat** / **Devam et**
+- **Ayarlar…**
+- **Haftalık rapor…**: son 7 günün grafiği (spor ve kaçırılan dakikalar), toplamlar ve serin
+
+Simge her girişte kendiliğinden açılır. "Menü çubuğundan kaldır" dersen bir sonraki girişe kadar gizlenir; spor uyarıları bundan etkilenmez.
 
 ### Ne zaman görünmez
 
@@ -58,7 +71,7 @@ Ya da Finder'da dosyalara çift tıkla:
 |---|---|
 | `kur.command` | Derler, kurar, zamanlayıcıyı başlatır. Güncelleme için de tekrar çalıştır. |
 | `deneme.command` | Ekranları dener (20 sn'lik spor + iki gece uyarısı). İstatistiğe yazılmaz. |
-| `rapor.command` | Son 7 günün tablosu: seans, spor dakikası, pas, mahrum kalınan dakika. |
+| `rapor.command` | Son 7 günün tablosu, terminalde (grafikli hali menü çubuğunda). |
 | `ayarlar.command` | Ayar ekranı: spor aralığı, spor süresi, müzik. |
 | `duraklat.command` | Geçici olarak durdurur / yeniden açar. |
 | `kaldir.command` | Kaldırır. Geçmiş verin silinmez. |
@@ -111,6 +124,7 @@ It doesn't tell you what to do. It asks: **are you actually doing it, or skippin
 - **Your own rhythm.** Pick how often to move (hours + minutes) and how long each session lasts in the settings window.
 - **An honest tally.** Every session, skip and missed minute is logged; `rapor.command` shows the last 7 days.
 - **Quiet at the right time.** Stays out of the way during calls, screen sharing, or when you're away from the desk.
+- **In your menu bar.** The next workout time is always visible; pause, change settings, or open your weekly report in one click.
 
 ### How it works
 
@@ -120,6 +134,18 @@ It doesn't tell you what to do. It asks: **are you actually doing it, or skippin
 - **Start?** A countdown (10 minutes by default) and **the workout music kicks in**; it fades out when time is up. Ending early still counts the missing minutes. **Küçült · müzik aç** (or `M`) shrinks it to a small corner timer so you can put on music or use the computer; the session keeps running and is not a skip. It returns to full screen when time is up.
 - **Done:** today's session count and total exercise time.
 - **23:30:** "Get ready for bed." **23:59:** "Bedtime." Night notices close only with **Tamam** (OK), and can be turned off in settings.
+
+### Menu bar
+
+After installing, a running-figure icon with the next workout time appears in the menu bar (⏸ when paused). Click it for:
+
+- When the next workout is, today's sessions and minutes, and your streak (days in a row with at least one session)
+- **Şimdi spor yap** (Work out now): start without waiting
+- **1 saat duraklat** / **Bugünlük duraklat** / **Devam et** (Pause 1 hour / Pause for today / Resume)
+- **Ayarlar…** (Settings)
+- **Haftalık rapor…** (Weekly report): a 7-day chart of exercise and missed minutes, totals and your streak
+
+The icon starts at every login. "Menü çubuğundan kaldır" hides it until the next login; workout prompts keep working.
 
 ### When it stays hidden
 

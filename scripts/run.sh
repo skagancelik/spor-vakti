@@ -19,7 +19,13 @@ if [ "$1" = "--kuru" ]; then KURU=1; ARGS=(); shift; fi
 karar() { if [ "$KURU" = 1 ]; then echo "$*"; exit 0; fi; }
 
 if [ "$1" != "--deneme" ]; then
-  if [ -f "$DATA_DIR/DURAKLAT" ]; then log "atlandı: duraklatılmış"; exit 0; fi
+  if [ -f "$DATA_DIR/DURAKLAT" ]; then karar "atla: duraklatılmış"; log "atlandı: duraklatılmış"; exit 0; fi
+  # Menüden "1 saat / bugünlük duraklat": duraklat_bitis içinde bitiş zamanı (epoch)
+  if [ -f "$DATA_DIR/duraklat_bitis" ]; then
+    B=$(tr -dc '0-9' < "$DATA_DIR/duraklat_bitis")
+    if [ -n "$B" ] && [ "$(date +%s)" -lt "$B" ]; then karar "atla: duraklatılmış (süreli)"; log "atlandı: duraklatılmış (süreli)"; exit 0; fi
+    rm -f "$DATA_DIR/duraklat_bitis"
+  fi
 
   NOW_HM="${SPOR_VAKTI_SIMDI:-$(date +%H:%M)}"
   HOUR=$((10#${NOW_HM%:*})); MIN=$((10#${NOW_HM#*:}))
@@ -87,7 +93,8 @@ if [ "$1" != "--deneme" ]; then
   fi
 fi
 
-if pgrep -x spor-vakti >/dev/null 2>&1; then log "atlandı: ekran zaten açık"; exit 0; fi
+# Spor/uyku ekranı zaten açıksa ikinciyi açma (menü simgesi ve ayar penceresi sayılmaz)
+if ps -axo args= | grep -E "^$BIN( |$)" | grep -vqE " (menu|ayarlar)$"; then log "atlandı: ekran zaten açık"; exit 0; fi
 if [ ! -x "$BIN" ]; then log "HATA: $BIN yok — önce kur.command çalıştır"; exit 1; fi
 
 log "gösteriliyor ${ARGS[*]}"
