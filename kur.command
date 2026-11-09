@@ -9,13 +9,28 @@ PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 echo "=== Spor Vakti kurulumu ==="
 mkdir -p "$APP_DIR" "$HOME/Library/LaunchAgents"
 
-echo "-- derleniyor"
-/usr/bin/swiftc -O -o "$APP_DIR/spor-vakti" "$SRC/src/main.swift"
+# Hazır sürüm (GitHub Releases zip'i) bin/ içinde derlenmiş dosyayla gelir: Xcode gerekmez.
+# Repodan kuruluyorsa kaynak koddan derlenir (Xcode Command Line Tools gerekir).
+if [ -x "$SRC/bin/spor-vakti" ]; then
+  echo "-- hazır sürüm kuruluyor"
+  cp "$SRC/bin/spor-vakti" "$APP_DIR/spor-vakti"
+else
+  if ! xcrun --find swiftc >/dev/null 2>&1; then
+    echo "❌ Derleyici yok. İki yol var:"
+    echo "   1) Hazır sürümü indir: https://github.com/skagancelik/spor-vakti/releases/latest"
+    echo "   2) Xcode Command Line Tools kur:  xcode-select --install"
+    exit 1
+  fi
+  echo "-- derleniyor"
+  /usr/bin/swiftc -O -o "$APP_DIR/spor-vakti" "$SRC/src/main.swift"
+fi
 cp "$SRC/scripts/run.sh" "$APP_DIR/run.sh"
 # Spor sırasında çalan müzikler: repodaki parçaları kopyala, kullanıcının eklediklerine dokunma
 mkdir -p "$APP_DIR/muzik"
 cp "$SRC"/muzik/* "$APP_DIR/muzik/" 2>/dev/null || true
 chmod +x "$APP_DIR/spor-vakti" "$APP_DIR/run.sh"
+# İnternetten indirilen dosyalardaki karantina işaretini kaldır (launchd'nin çalıştırabilmesi için)
+xattr -dr com.apple.quarantine "$APP_DIR" 2>/dev/null || true
 
 echo "-- LaunchAgent yazılıyor"
 cat > "$PLIST" <<PL
@@ -51,8 +66,11 @@ cat > "$PLIST" <<PL
 </plist>
 PL
 
-launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
-launchctl bootstrap "gui/$(id -u)" "$PLIST"
+# bootout eşzamansızdır: eski kayıt kalkana kadar birkaç kez dene
+yukle() { launchctl bootout "gui/$(id -u)/$1" 2>/dev/null || true
+  for i in 1 2 3 4 5; do launchctl bootstrap "gui/$(id -u)" "$2" 2>/dev/null && return 0; sleep 1; done
+  launchctl bootstrap "gui/$(id -u)" "$2"; }
+yukle "$LABEL" "$PLIST"
 
 echo "-- menü çubuğu simgesi"
 MLABEL="com.sporvakti.menu"
@@ -74,8 +92,7 @@ cat > "$MPLIST" <<PL
 </dict>
 </plist>
 PL
-launchctl bootout "gui/$(id -u)/$MLABEL" 2>/dev/null || true
-launchctl bootstrap "gui/$(id -u)" "$MPLIST"
+yukle "$MLABEL" "$MPLIST"
 echo "✅ Kuruldu. Spor uyarıları ayarladığın saatlerde gelir (varsayılan 07:00–23:00, saat başı), uyku uyarıları 23:30 ve 23:59'da."
 echo "   Menü çubuğundaki koşan adam simgesi: sonraki spor, duraklat, ayarlar, rapor."
 echo "   Denemek için: deneme.command"

@@ -64,7 +64,15 @@ Simge her girişte kendiliğinden açılır. "Menü çubuğundan kaldır" dersen
 
 ### Kurulum
 
-macOS ve Xcode Command Line Tools (`swiftc`) gerekir.
+**Kolay yol (Xcode gerekmez):** [Releases](https://github.com/skagancelik/spor-vakti/releases/latest) sayfasından `SporVakti-x.y.z.zip` dosyasını indir, aç, içindeki `kur.command`'a çift tıkla. Paket hem Apple Silicon hem Intel Mac'te çalışır (macOS 13+), müzikler içinde gelir.
+
+İlk açılışta macOS "geliştiricisi doğrulanamadı" diyebilir (uygulama Apple'a ücretli imzalatılmadı). O zaman `kur.command`'a **sağ tıkla → Aç** de, ya da **Sistem Ayarları → Gizlilik ve Güvenlik → Yine de Aç**. Terminal'den de olur:
+
+```bash
+xattr -dr com.apple.quarantine ~/Downloads/SporVakti-*
+```
+
+**Geliştirici yolu (kaynak koddan derler):** macOS ve Xcode Command Line Tools (`xcode-select --install`) gerekir.
 
 ```bash
 git clone https://github.com/skagancelik/spor-vakti.git
@@ -179,7 +187,15 @@ No answer within 5 minutes counts as a skip.
 
 ### Install
 
-Requires macOS and Xcode Command Line Tools (`swiftc`).
+**Easy way (no Xcode needed):** download `SporVakti-x.y.z.zip` from [Releases](https://github.com/skagancelik/spor-vakti/releases/latest), unzip it and double-click `kur.command`. The package runs on both Apple Silicon and Intel Macs (macOS 13+) and includes the music.
+
+macOS may say the developer can't be verified (the app isn't notarized by Apple). Then **right-click `kur.command` → Open**, or use **System Settings → Privacy & Security → Open Anyway**. Or from Terminal:
+
+```bash
+xattr -dr com.apple.quarantine ~/Downloads/SporVakti-*
+```
+
+**Developer way (builds from source):** requires macOS and Xcode Command Line Tools (`xcode-select --install`).
 
 ```bash
 git clone https://github.com/skagancelik/spor-vakti.git
