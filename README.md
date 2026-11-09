@@ -15,7 +15,12 @@ Sana ne yapacağını söylemez. Ama sana sorar: **gerçekten yapıyor musun, yo
 ### İndirdiğinde elinde neler var
 
 - **Hazır spor müziği.** 10 enstrümantal, enerjik parça (her biri yaklaşık 5 dk, toplam 50 dk) uygulamayla birlikte gelir. Spora başladığın an çalmaya başlar, süre bitince kendiliğinden susar. Ayrıca müzik aramana, hesap açmana, internete gerek yok.
-- **Ne yapacağını bilirsin.** Seans sırasında dakikada bir yeni, ekipmansız hareket önerisi: sandalyeden kalk-otur, masaya dayanarak şınav, duvarda oturma… İstersen ayarlardan kapatırsın.
+- **Ne yapacağını bilirsin.** Seans sırasında dakikada bir yeni, ekipmansız hareket önerisi. Öneriler nerede olduğuna ve amacına göre seçilir:
+
+  | | Hareketsiz kalmayayım | Spor yapayım |
+  |---|---|---|
+  | **Ofisteyim** | Ayakta, dikkat çekmeyen hareketler: yerinde yürü, ağırlık aktar, omuz çevir, kollarını aç, boynunu esnet… | Ofiste yapılabilen spor: sandalyeden kalk-otur, masaya dayanarak şınav, duvarda otur, geriye hamle, masada plank… |
+  | **Evdeyim** | Olduğun yerde kalk ve hareket et: yerinde yürü, gerin, öne sarkıl, müzikle hareket et… | Gerçek antrenman: squat, şınav, jumping jack, plank, öne hamle, köprü, dağcı… |
 - **Kendi ritmin.** Kaç saat kaç dakikada bir spor yapacağını ve her seansın kaç dakika süreceğini ayar ekranından seçersin.
 - **Dürüst bir hesap.** Her seans, her pas, kaçırılan her dakika kayda geçer; `rapor.command` son 7 günü gösterir.
 - **Doğru anda susar.** Görüşmedeyken, ekran paylaşırken ya da bilgisayar başında değilken araya girmez. Son aralıkta zaten masadan kalktıysan o uyarıyı atlar.
@@ -90,7 +95,7 @@ Spor ekranında sağ üstteki **Ayarlar** düğmesine bas (ya da `A`), veya iste
 | **Spor aralığı** | Kaç saat + kaç dakikada bir (5 dk adımlarla, en az 15 dk). Uyarılar başlangıç saatinden itibaren bu aralıkla tekrar eder: 09:00 ve 1 saat 30 dk → 09:00, 10:30, 12:00… Ekran örnek düzeni ve günde kaç uyarı geleceğini gösterir. | 1 saat |
 | **Spor süresi** | 1–60 dakika | 10 dk |
 | **Uyku uyarıları** | 23:30 "Uyku hazırlığı" ve 23:59 "Uyku vakti" ekranları: açık / kapalı | Açık |
-| **Hareket önerileri** | Spor sırasında dakikada bir değişen hareket: açık / kapalı | Açık |
+| **Hareket önerileri** | Açık / kapalı; **Ofisteyim / Evdeyim** ve **Hareketsiz kalmayayım / Spor yapayım** | Açık, ofis, spor |
 | **Dil** | Sistem dili / Türkçe / English | Sistem dili |
 | **Masadan zaten kalktıysan uyarma** | Son aralıkta 5 dakikadan uzun bilgisayardan uzaktaysan o uyarıyı atla | Açık |
 | **Müzik** | Spor boyunca müzik çal: açık / kapalı, ses seviyesi (%10–100) | Açık, %80 |
@@ -130,7 +135,12 @@ It doesn't tell you what to do. It asks: **are you actually doing it, or skippin
 ### What you get out of the box
 
 - **Built-in workout music.** 10 energetic instrumental tracks (about 5 minutes each, 50 minutes in total) ship with the app. They start the moment you start a session and stop on their own when time is up. No streaming service, no account, no internet.
-- **You know what to do.** During the session a new no-equipment move appears every minute: chair squats, desk push-ups, wall sits… Turn it off in settings if you prefer.
+- **You know what to do.** During the session a new no-equipment move appears every minute, picked for where you are and what you want:
+
+  | | Just keep moving | Real exercise |
+  |---|---|---|
+  | **At the office** | Low-key standing moves: walk in place, shift your weight, shoulder rolls, arm raises, neck stretch… | Office-friendly training: chair squats, desk push-ups, wall sit, reverse lunges, desk plank… |
+  | **At home** | Get up and move where you are: walk in place, big stretch, forward fold, move to the music… | A proper workout: squats, push-ups, jumping jacks, plank, lunges, glute bridge, mountain climbers… |
 - **Your own rhythm.** Pick how often to move (hours + minutes) and how long each session lasts in the settings window.
 - **An honest tally.** Every session, skip and missed minute is logged; `rapor.command` shows the last 7 days.
 - **Quiet at the right time.** Stays out of the way during calls, screen sharing, or when you're away from the desk. If you already got up during the last interval, it skips that prompt.
@@ -191,7 +201,7 @@ Press **Ayarlar** (or `A`) on the workout prompt, or double-click `ayarlar.comma
 | **Interval** (Spor aralığı) | Hours + minutes, 5-minute steps, at least 15 min. Prompts repeat from the start time: 09:00 and 1 h 30 min → 09:00, 10:30, 12:00… The window previews the schedule and how many prompts you'll get per day. | 1 hour |
 | **Session length** (Spor süresi) | 1–60 minutes | 10 min |
 | **Sleep notices** (Uyku uyarıları) | The 23:30 "Get ready for bed" and 23:59 "Bedtime" screens: on / off | On |
-| **Move suggestions** (Hareket önerileri) | A new move every minute during the session: on / off | On |
+| **Move suggestions** (Hareket önerileri) | On / off; **At the office / At home** and **Just keep moving / Real exercise** | On, office, exercise |
 | **Language** (Dil) | System language / Türkçe / English | System language |
 | **Skip if already up** (Masadan zaten kalktıysan uyarma) | Skip the prompt if you were away for 5+ minutes during the last interval | On |
 | **Music** (Müzik) | Play music during the session: on / off, volume (10–100%) | On, 80% |
